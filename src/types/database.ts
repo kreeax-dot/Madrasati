@@ -11,12 +11,52 @@ export interface Profile {
   created_at: string;
 }
 
+export interface SchoolFeatures {
+  payments: boolean;
+  messages: boolean;
+  absences: boolean;
+  schedule: boolean;
+}
+
 export interface School {
   id: string;
   name: string;
   address: string | null;
   phone: string | null;
   logo_url: string | null;
+  features: SchoolFeatures;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface Class {
+  id: string;
+  school_id: string;
+  name: string;
+  level: string | null;
+  created_at: string;
+}
+
+export interface Schedule {
+  id: string;
+  school_id: string;
+  class_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  subject: string;
+  teacher: string | null;
+  room: string | null;
+  created_at: string;
+}
+
+export interface Absence {
+  id: string;
+  school_id: string;
+  student_id: string;
+  date: string;
+  reason: string | null;
+  justified: boolean;
   created_at: string;
 }
 
@@ -24,6 +64,7 @@ export interface Student {
   id: string;
   school_id: string;
   full_name: string;
+  class_id: string | null;
   class_name: string | null;
   date_of_birth: string | null;
   parent_id: string | null;

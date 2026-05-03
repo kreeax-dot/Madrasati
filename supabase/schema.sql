@@ -122,6 +122,10 @@ drop policy if exists "profiles_admin_insert" on profiles;
 create policy "profiles_admin_insert" on profiles for insert
   with check (is_super_admin() or current_role_value() = 'director');
 
+drop policy if exists "profiles_self_insert" on profiles;
+create policy "profiles_self_insert" on profiles for insert
+  with check (id = auth.uid());
+
 -- students
 drop policy if exists "students_select" on students;
 create policy "students_select" on students for select
@@ -175,22 +179,8 @@ create policy "messages_update_own" on messages for update
   using (recipient_id = auth.uid())
   with check (recipient_id = auth.uid());
 
--- ─── AUTO-CREATE PROFILE ON SIGNUP ───────────────────────────────────────────
-create or replace function handle_new_user() returns trigger
-language plpgsql security definer as $$
-begin
-  insert into profiles (id, email, full_name, role)
-  values (
-    new.id,
-    new.email,
-    coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
-    coalesce((new.raw_user_meta_data->>'role')::user_role, 'parent')
-  )
-  on conflict (id) do nothing;
-  return new;
-end $$;
-
+-- Profile creation is handled by the app on first authenticated request,
+-- not via a trigger (triggers caused intermittent "Database error" failures
+-- on user creation in the Supabase dashboard).
 drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function handle_new_user();
+drop function if exists public.handle_new_user();

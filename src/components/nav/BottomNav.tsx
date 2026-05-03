@@ -2,22 +2,54 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Wallet, MessagesSquare } from "lucide-react";
+import {
+  Home,
+  Users,
+  Wallet,
+  MessagesSquare,
+  CalendarRange,
+  ClipboardList,
+  School as SchoolIcon,
+  GraduationCap,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { UserRole } from "@/types/database";
 
-const items = [
+const directorItems = [
   { href: "/dashboard", label: "Accueil", icon: Home },
+  { href: "/classes", label: "Classes", icon: GraduationCap },
   { href: "/students", label: "Élèves", icon: Users },
   { href: "/payments", label: "Paiements", icon: Wallet },
   { href: "/messages", label: "Messages", icon: MessagesSquare },
 ];
 
-export function BottomNav() {
+const parentItems = [
+  { href: "/dashboard", label: "Accueil", icon: Home },
+  { href: "/schedule", label: "Horaires", icon: CalendarRange },
+  { href: "/absences", label: "Absences", icon: ClipboardList },
+  { href: "/payments", label: "Paiements", icon: Wallet },
+  { href: "/messages", label: "Messages", icon: MessagesSquare },
+];
+
+const adminItems = [
+  { href: "/admin", label: "Écoles", icon: SchoolIcon },
+];
+
+export function BottomNav({ role }: { role: UserRole }) {
   const pathname = usePathname();
+  const items =
+    role === "director"
+      ? directorItems
+      : role === "super_admin"
+        ? adminItems
+        : parentItems;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-md border-t border-slate-100 bg-white/95 backdrop-blur safe-bottom">
-      <ul className="grid grid-cols-4">
+      <ul
+        className="grid"
+        style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
+      >
         {items.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
