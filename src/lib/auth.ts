@@ -1,8 +1,11 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, UserRole } from "@/types/database";
 
-export async function getSessionProfile(): Promise<{
+export const getSessionProfile = cache(_getSessionProfile);
+
+async function _getSessionProfile(): Promise<{
   userId: string;
   email: string;
   profile: Profile;

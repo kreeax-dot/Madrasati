@@ -2,6 +2,7 @@ import { TopBar } from "@/components/nav/TopBar";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
 import { ScheduleEditor } from "@/components/director/ScheduleEditor";
+import { Realtime } from "@/components/Realtime";
 
 const DAYS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 
@@ -52,6 +53,7 @@ export default async function SchedulePage() {
 
   return (
     <div className="space-y-5">
+      <Realtime tables={["schedules"]} />
       <TopBar subtitle="Emploi du temps" title="Horaires" />
       {filtered.length === 0 ? (
         <div className="card px-4 py-10 text-center text-sm text-slate-400">

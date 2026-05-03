@@ -4,12 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
-
-async function getSchoolId() {
-  const { profile } = await requireRole(["director"]);
-  if (!profile.school_id) throw new Error("Aucune école assignée");
-  return profile.school_id;
-}
+import { generateCode } from "@/lib/codes";
 
 // ─── CLASSES ──────────────────────────────────────────────────────────────────
 export async function createClass(formData: FormData) {
@@ -37,25 +32,80 @@ export async function deleteClass(classId: string) {
   revalidatePath("/classes");
 }
 
+async function getSchoolId() {
+  const { profile } = await requireRole(["director"]);
+  if (!profile.school_id) throw new Error("Aucune école assignée");
+  return profile.school_id;
+}
+
 // ─── STUDENTS ─────────────────────────────────────────────────────────────────
-export async function createStudent(formData: FormData) {
+export async function createStudent(formData: FormData): Promise<{
+  studentId: string;
+  code: string;
+}> {
   const schoolId = await getSchoolId();
   const supabase = createClient();
 
-  const fullName = String(formData.get("full_name") ?? "").trim();
+  const firstName = String(formData.get("first_name") ?? "").trim();
+  const lastName = String(formData.get("last_name") ?? "").trim();
+  const fullName = `${firstName} ${lastName}`.trim();
+  const dob = String(formData.get("date_of_birth") ?? "") || null;
   const classId = String(formData.get("class_id") ?? "") || null;
   if (!fullName) throw new Error("Nom requis");
 
-  const { error } = await supabase.from("students").insert({
-    school_id: schoolId,
-    full_name: fullName,
-    class_id: classId,
-    class_name: null,
-  });
-  if (error) throw new Error(error.message);
+  const { data: student, error } = await supabase
+    .from("students")
+    .insert({
+      school_id: schoolId,
+      full_name: fullName,
+      class_id: classId,
+      date_of_birth: dob,
+    })
+    .select("id")
+    .single();
+  if (error || !student) throw new Error(error?.message ?? "Erreur");
+
+  // Generate a unique code (retry on collision; 7 chars from 31-char alphabet → ~27 billion possibilities).
+  let code = "";
+  for (let attempt = 0; attempt < 5; attempt++) {
+    code = generateCode(7);
+    const { error: codeErr } = await supabase.from("student_codes").insert({
+      code,
+      student_id: student.id,
+      school_id: schoolId,
+    });
+    if (!codeErr) break;
+    if (attempt === 4) throw new Error("Impossible de générer un code unique");
+  }
 
   revalidatePath("/students");
-  redirect("/students");
+  return { studentId: student.id, code };
+}
+
+export async function regenerateStudentCode(studentId: string): Promise<string> {
+  const schoolId = await getSchoolId();
+  const supabase = createClient();
+
+  // Invalidate any active codes for this student.
+  await supabase
+    .from("student_codes")
+    .update({ used_at: new Date().toISOString() })
+    .eq("student_id", studentId)
+    .is("used_at", null);
+
+  let code = "";
+  for (let attempt = 0; attempt < 5; attempt++) {
+    code = generateCode(7);
+    const { error } = await supabase.from("student_codes").insert({
+      code,
+      student_id: studentId,
+      school_id: schoolId,
+    });
+    if (!error) break;
+    if (attempt === 4) throw new Error("Impossible de générer un code unique");
+  }
+  revalidatePath(`/students/${studentId}`);
+  return code;
 }
 
 export async function assignStudentToClass(studentId: string, classId: string | null) {
@@ -108,6 +158,44 @@ export async function deleteSchedule(scheduleId: string) {
   const { error } = await supabase.from("schedules").delete().eq("id", scheduleId);
   if (error) throw new Error(error.message);
   revalidatePath("/schedule");
+}
+
+// ─── HOMEWORK (class-based) ───────────────────────────────────────────────────
+export async function createHomework(formData: FormData) {
+  const schoolId = await getSchoolId();
+  const supabase = createClient();
+  const { profile } = await requireRole(["director"]);
+
+  const classId = String(formData.get("class_id") ?? "");
+  const subject = String(formData.get("subject") ?? "").trim();
+  const title = String(formData.get("title") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim() || null;
+  const dueDate = String(formData.get("due_date") ?? "");
+
+  if (!classId || !subject || !title || !dueDate) {
+    throw new Error("Champs requis");
+  }
+
+  const { error } = await supabase.from("homework").insert({
+    school_id: schoolId,
+    class_id: classId,
+    subject,
+    title,
+    description,
+    due_date: dueDate,
+    created_by: profile.id,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/homework");
+}
+
+export async function deleteHomework(id: string) {
+  await getSchoolId();
+  const supabase = createClient();
+  const { error } = await supabase.from("homework").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/homework");
 }
 
 // ─── ABSENCES ─────────────────────────────────────────────────────────────────

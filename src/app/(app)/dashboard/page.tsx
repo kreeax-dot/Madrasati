@@ -7,11 +7,13 @@ import {
   CalendarRange,
   ClipboardList,
   GraduationCap,
+  BookOpen,
 } from "lucide-react";
 import { TopBar } from "@/components/nav/TopBar";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/auth";
 import { formatCurrency } from "@/lib/utils";
+import { Realtime } from "@/components/Realtime";
 
 export default async function DashboardPage() {
   const { profile } = await getSessionProfile();
@@ -19,14 +21,22 @@ export default async function DashboardPage() {
 
   const fullName = profile.full_name ?? "Utilisateur";
   const isDirector = profile.role === "director";
+  const isStudent = profile.role === "student";
 
-  const counters = await Promise.all([
-    isDirector
-      ? supabase.from("students").select("id", { count: "exact", head: true })
+  const studentsQ = isDirector
+    ? supabase.from("students").select("id", { count: "exact", head: true })
+    : isStudent && profile.student_id
+      ? supabase
+          .from("students")
+          .select("id", { count: "exact", head: true })
+          .eq("id", profile.student_id)
       : supabase
           .from("students")
           .select("id", { count: "exact", head: true })
-          .eq("parent_id", profile.id),
+          .eq("parent_id", profile.id);
+
+  const counters = await Promise.all([
+    studentsQ,
     supabase
       .from("payments")
       .select("id", { count: "exact", head: true })
@@ -49,8 +59,15 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <Realtime tables={["payments", "messages", "homework"]} />
       <TopBar
-        subtitle={isDirector ? "Directeur" : "Bonjour"}
+        subtitle={
+          profile.role === "director"
+            ? "Directeur"
+            : profile.role === "student"
+              ? "Élève"
+              : "Bonjour"
+        }
         title={fullName.split(" ")[0]}
         name={fullName}
       />
@@ -60,7 +77,10 @@ export default async function DashboardPage() {
           Aperçu rapide
         </p>
         <div className="mt-3 grid grid-cols-3 gap-3">
-          <Stat label={isDirector ? "Élèves" : "Enfants"} value={studentsCount} />
+          <Stat
+            label={isDirector ? "Élèves" : isStudent ? "Profil" : "Enfants"}
+            value={studentsCount}
+          />
           <Stat label="Impayés" value={pendingPayments} />
           <Stat label="Messages" value={unread} />
         </div>
@@ -74,13 +94,14 @@ export default async function DashboardPage() {
               <QuickLink href="/classes" icon={<GraduationCap className="h-5 w-5" />} label="Classes" />
               <QuickLink href="/students" icon={<Users className="h-5 w-5" />} label="Élèves" />
               <QuickLink href="/schedule" icon={<CalendarRange className="h-5 w-5" />} label="Horaires" />
+              <QuickLink href="/homework" icon={<BookOpen className="h-5 w-5" />} label="Devoirs" />
               <QuickLink href="/absences" icon={<ClipboardList className="h-5 w-5" />} label="Absences" />
               <QuickLink href="/payments" icon={<Wallet className="h-5 w-5" />} label="Paiements" />
-              <QuickLink href="/messages" icon={<MessagesSquare className="h-5 w-5" />} label="Messages" />
             </>
           ) : (
             <>
               <QuickLink href="/schedule" icon={<CalendarRange className="h-5 w-5" />} label="Horaires" />
+              <QuickLink href="/homework" icon={<BookOpen className="h-5 w-5" />} label="Devoirs" />
               <QuickLink href="/absences" icon={<ClipboardList className="h-5 w-5" />} label="Absences" />
               <QuickLink href="/payments" icon={<Wallet className="h-5 w-5" />} label="Paiements" />
               <QuickLink href="/messages" icon={<MessagesSquare className="h-5 w-5" />} label="Messages" />

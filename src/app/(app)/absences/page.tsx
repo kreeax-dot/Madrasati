@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
 import { formatDate } from "@/lib/utils";
 import { AbsenceCreator } from "@/components/director/AbsenceCreator";
+import { Realtime } from "@/components/Realtime";
 
 export default async function AbsencesPage() {
   const { profile } = await requireRole(["director", "parent", "student"]);
@@ -20,6 +21,7 @@ export default async function AbsencesPage() {
 
   return (
     <div className="space-y-5">
+      <Realtime tables={["absences"]} />
       <TopBar subtitle="Suivi" title="Absences" />
 
       {isDirector && <AbsenceCreator students={(students as any[]) ?? []} />}

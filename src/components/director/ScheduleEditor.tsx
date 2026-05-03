@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { createSchedule, deleteSchedule } from "@/app/actions/director";
+import { useRouter } from "next/navigation";
 
 const DAYS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 
@@ -25,14 +26,19 @@ export function ScheduleEditor({
   classes: Cls[];
   schedules: Slot[];
 }) {
+  const router = useRouter();
   const [selected, setSelected] = useState<string>(classes[0]?.id ?? "");
   const [showForm, setShowForm] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [optimisticDeleted, setOptimisticDeleted] = useState<Set<string>>(new Set());
 
   const filtered = useMemo(
-    () => schedules.filter((s) => s.class_id === selected),
-    [schedules, selected],
+    () =>
+      schedules.filter(
+        (s) => s.class_id === selected && !optimisticDeleted.has(s.id),
+      ),
+    [schedules, selected, optimisticDeleted],
   );
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -52,8 +58,10 @@ export function ScheduleEditor({
   }
 
   function onDelete(id: string) {
+    setOptimisticDeleted((prev) => new Set(prev).add(id));
     startTransition(async () => {
       await deleteSchedule(id);
+      router.refresh();
     });
   }
 

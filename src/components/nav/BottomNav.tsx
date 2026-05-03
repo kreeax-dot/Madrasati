@@ -11,6 +11,7 @@ import {
   ClipboardList,
   School as SchoolIcon,
   GraduationCap,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/types/database";
@@ -19,15 +20,23 @@ const directorItems = [
   { href: "/dashboard", label: "Accueil", icon: Home },
   { href: "/classes", label: "Classes", icon: GraduationCap },
   { href: "/students", label: "Élèves", icon: Users },
+  { href: "/homework", label: "Devoirs", icon: BookOpen },
   { href: "/payments", label: "Paiements", icon: Wallet },
+];
+
+const studentItems = [
+  { href: "/dashboard", label: "Accueil", icon: Home },
+  { href: "/schedule", label: "Horaires", icon: CalendarRange },
+  { href: "/homework", label: "Devoirs", icon: BookOpen },
+  { href: "/absences", label: "Absences", icon: ClipboardList },
   { href: "/messages", label: "Messages", icon: MessagesSquare },
 ];
 
 const parentItems = [
   { href: "/dashboard", label: "Accueil", icon: Home },
   { href: "/schedule", label: "Horaires", icon: CalendarRange },
-  { href: "/absences", label: "Absences", icon: ClipboardList },
   { href: "/payments", label: "Paiements", icon: Wallet },
+  { href: "/absences", label: "Absences", icon: ClipboardList },
   { href: "/messages", label: "Messages", icon: MessagesSquare },
 ];
 
@@ -42,7 +51,9 @@ export function BottomNav({ role }: { role: UserRole }) {
       ? directorItems
       : role === "super_admin"
         ? adminItems
-        : parentItems;
+        : role === "student"
+          ? studentItems
+          : parentItems;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-md border-t border-slate-100 bg-white/95 backdrop-blur safe-bottom">

@@ -6,8 +6,32 @@ export interface Profile {
   full_name: string;
   role: UserRole;
   school_id: string | null;
+  student_id: string | null;
   phone: string | null;
   avatar_url: string | null;
+  created_at: string;
+}
+
+export interface StudentCode {
+  id: string;
+  code: string;
+  student_id: string;
+  school_id: string;
+  expires_at: string | null;
+  used_at: string | null;
+  used_by: string | null;
+  created_at: string;
+}
+
+export interface Homework {
+  id: string;
+  school_id: string;
+  class_id: string;
+  subject: string;
+  title: string;
+  description: string | null;
+  due_date: string;
+  created_by: string | null;
   created_at: string;
 }
 
