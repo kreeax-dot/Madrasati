@@ -5,13 +5,13 @@ import { usePathname } from "next/navigation";
 import {
   Home,
   Users,
-  Wallet,
-  MessagesSquare,
   CalendarRange,
-  ClipboardList,
   School as SchoolIcon,
   GraduationCap,
   BookOpen,
+  UtensilsCrossed,
+  Wallet,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/types/database";
@@ -21,28 +21,26 @@ const directorItems = [
   { href: "/classes", label: "Classes", icon: GraduationCap },
   { href: "/students", label: "Élèves", icon: Users },
   { href: "/homework", label: "Devoirs", icon: BookOpen },
-  { href: "/payments", label: "Paiements", icon: Wallet },
+  { href: "/canteen", label: "Cantine", icon: UtensilsCrossed },
 ];
 
 const studentItems = [
   { href: "/dashboard", label: "Accueil", icon: Home },
   { href: "/schedule", label: "Horaires", icon: CalendarRange },
   { href: "/homework", label: "Devoirs", icon: BookOpen },
+  { href: "/canteen", label: "Cantine", icon: UtensilsCrossed },
   { href: "/absences", label: "Absences", icon: ClipboardList },
-  { href: "/messages", label: "Messages", icon: MessagesSquare },
 ];
 
 const parentItems = [
   { href: "/dashboard", label: "Accueil", icon: Home },
   { href: "/schedule", label: "Horaires", icon: CalendarRange },
   { href: "/payments", label: "Paiements", icon: Wallet },
+  { href: "/canteen", label: "Cantine", icon: UtensilsCrossed },
   { href: "/absences", label: "Absences", icon: ClipboardList },
-  { href: "/messages", label: "Messages", icon: MessagesSquare },
 ];
 
-const adminItems = [
-  { href: "/admin", label: "Écoles", icon: SchoolIcon },
-];
+const adminItems = [{ href: "/admin", label: "Écoles", icon: SchoolIcon }];
 
 export function BottomNav({ role }: { role: UserRole }) {
   const pathname = usePathname();

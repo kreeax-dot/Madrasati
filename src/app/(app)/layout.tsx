@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/auth";
 import { BottomNav } from "@/components/nav/BottomNav";
+import { AppHeader } from "@/components/nav/AppHeader";
 
 export default async function AppLayout({
   children,
@@ -13,7 +14,8 @@ export default async function AppLayout({
 
   return (
     <div className="mx-auto min-h-dvh w-full max-w-md bg-slate-50 pb-24">
-      <main className="px-5 pt-4 safe-top">{children}</main>
+      <AppHeader />
+      <main className="px-5 pt-2 pb-6">{children}</main>
       <BottomNav role={profile.role} />
     </div>
   );

@@ -1,28 +1,21 @@
 import Link from "next/link";
-import {
-  Users,
-  Wallet,
-  MessagesSquare,
-  ChevronRight,
-  CalendarRange,
-  ClipboardList,
-  GraduationCap,
-  BookOpen,
-} from "lucide-react";
-import { TopBar } from "@/components/nav/TopBar";
+import { ChevronRight, Users, GraduationCap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/auth";
-import { formatCurrency } from "@/lib/utils";
+import { getCurrentSchool } from "@/lib/school";
+import { features, type FeatureKey } from "@/lib/features";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { Realtime } from "@/components/Realtime";
 
 export default async function DashboardPage() {
   const { profile } = await getSessionProfile();
   const supabase = createClient();
+  const school = await getCurrentSchool();
 
-  const fullName = profile.full_name ?? "Utilisateur";
   const isDirector = profile.role === "director";
   const isStudent = profile.role === "student";
 
+  // Counters (role-aware students count).
   const studentsQ = isDirector
     ? supabase.from("students").select("id", { count: "exact", head: true })
     : isStudent && profile.student_id
@@ -35,148 +28,189 @@ export default async function DashboardPage() {
           .select("id", { count: "exact", head: true })
           .eq("parent_id", profile.id);
 
-  const counters = await Promise.all([
+  const [
+    { count: studentsCount },
+    { count: pendingPayments },
+    { count: unread },
+    { data: nextHomework },
+    { data: recentPayments },
+  ] = await Promise.all([
     studentsQ,
     supabase
       .from("payments")
       .select("id", { count: "exact", head: true })
-      .eq("status", "pending"),
+      .neq("status", "paid"),
     supabase
       .from("messages")
       .select("id", { count: "exact", head: true })
       .is("read_at", null),
+    supabase
+      .from("homework")
+      .select("id, subject, title, due_date, classes(name)")
+      .gte("due_date", new Date().toISOString().slice(0, 10))
+      .order("due_date")
+      .limit(2),
+    supabase
+      .from("payments")
+      .select("id, amount, status, due_date, description, students(full_name)")
+      .order("created_at", { ascending: false })
+      .limit(3),
   ]);
 
-  const studentsCount = counters[0].count ?? 0;
-  const pendingPayments = counters[1].count ?? 0;
-  const unread = counters[2].count ?? 0;
+  const enabled = (school?.features ?? {
+    payments: true,
+    messages: true,
+    absences: true,
+    schedule: true,
+  }) as unknown as Record<string, boolean>;
 
-  const { data: recentPayments } = await supabase
-    .from("payments")
-    .select("id, amount, status, due_date, description, students(full_name)")
-    .order("created_at", { ascending: false })
-    .limit(3);
+  const directorTiles: FeatureKey[] = ["schedule", "homework", "absences", "payments", "canteen", "messages"];
+  const userTiles: FeatureKey[] = ["schedule", "homework", "canteen", "absences", "payments", "messages"];
+  const tiles = (isDirector ? directorTiles : userTiles).filter(
+    (k) => enabled[k] !== false || k === "homework" || k === "canteen",
+  );
 
   return (
     <div className="space-y-6">
-      <Realtime tables={["payments", "messages", "homework"]} />
-      <TopBar
-        subtitle={
-          profile.role === "director"
-            ? "Directeur"
-            : profile.role === "student"
-              ? "Élève"
-              : "Bonjour"
-        }
-        title={fullName.split(" ")[0]}
-        name={fullName}
-      />
+      <Realtime tables={["payments", "messages", "homework", "absences", "schedules", "canteen_menus"]} />
+
+      <header className="pt-1">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          Bonjour
+        </p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+          {profile.full_name.split(" ")[0]} 👋
+        </h1>
+      </header>
 
       <section className="card border-0 bg-gradient-to-br from-brand-600 to-brand-800 p-5 text-white">
-        <p className="text-xs font-medium uppercase tracking-wide text-white/70">
-          Aperçu rapide
+        <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">
+          {isDirector ? "Vue d'ensemble" : "Aperçu"}
         </p>
         <div className="mt-3 grid grid-cols-3 gap-3">
           <Stat
+            icon={<Users className="h-3.5 w-3.5 text-white/70" />}
             label={isDirector ? "Élèves" : isStudent ? "Profil" : "Enfants"}
-            value={studentsCount}
+            value={studentsCount ?? 0}
           />
-          <Stat label="Impayés" value={pendingPayments} />
-          <Stat label="Messages" value={unread} />
+          <Stat
+            icon={<GraduationCap className="h-3.5 w-3.5 text-white/70" />}
+            label="Impayés"
+            value={pendingPayments ?? 0}
+          />
+          <Stat
+            icon={<GraduationCap className="h-3.5 w-3.5 text-white/70" />}
+            label="Messages"
+            value={unread ?? 0}
+          />
         </div>
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-slate-700">Accès rapide</h2>
+        <h2 className="section-title mb-3">Accès rapide</h2>
         <div className="grid grid-cols-2 gap-3">
-          {isDirector ? (
-            <>
-              <QuickLink href="/classes" icon={<GraduationCap className="h-5 w-5" />} label="Classes" />
-              <QuickLink href="/students" icon={<Users className="h-5 w-5" />} label="Élèves" />
-              <QuickLink href="/schedule" icon={<CalendarRange className="h-5 w-5" />} label="Horaires" />
-              <QuickLink href="/homework" icon={<BookOpen className="h-5 w-5" />} label="Devoirs" />
-              <QuickLink href="/absences" icon={<ClipboardList className="h-5 w-5" />} label="Absences" />
-              <QuickLink href="/payments" icon={<Wallet className="h-5 w-5" />} label="Paiements" />
-            </>
-          ) : (
-            <>
-              <QuickLink href="/schedule" icon={<CalendarRange className="h-5 w-5" />} label="Horaires" />
-              <QuickLink href="/homework" icon={<BookOpen className="h-5 w-5" />} label="Devoirs" />
-              <QuickLink href="/absences" icon={<ClipboardList className="h-5 w-5" />} label="Absences" />
-              <QuickLink href="/payments" icon={<Wallet className="h-5 w-5" />} label="Paiements" />
-              <QuickLink href="/messages" icon={<MessagesSquare className="h-5 w-5" />} label="Messages" />
-            </>
-          )}
+          {tiles.map((k) => (
+            <FeatureTile key={k} feature={k} />
+          ))}
         </div>
       </section>
 
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-700">Derniers paiements</h2>
-          <Link href="/payments" className="text-xs font-medium text-brand-600">
-            Voir tout
-          </Link>
-        </div>
-        <div className="card divide-y divide-slate-100">
-          {(recentPayments ?? []).length === 0 ? (
-            <div className="px-4 py-10 text-center text-sm text-slate-400">
-              Aucun paiement pour le moment.
-            </div>
-          ) : (
-            recentPayments!.map((p: any) => (
+      {!isDirector && (nextHomework ?? []).length > 0 && (
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="section-title">Prochains devoirs</h2>
+            <Link href="/homework" className="text-xs font-medium text-brand-600">
+              Voir tout
+            </Link>
+          </div>
+          <ul className="space-y-2">
+            {nextHomework!.map((h: any) => (
+              <li key={h.id} className="card p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-purple-600">
+                      {h.subject}
+                    </p>
+                    <p className="mt-0.5 truncate text-sm font-medium text-slate-900">
+                      {h.title}
+                    </p>
+                  </div>
+                  <span className="badge-blue shrink-0">{formatDate(h.due_date)}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {(recentPayments ?? []).length > 0 && (
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="section-title">Derniers paiements</h2>
+            <Link href="/payments" className="text-xs font-medium text-brand-600">
+              Voir tout
+            </Link>
+          </div>
+          <div className="card divide-y divide-slate-100">
+            {recentPayments!.map((p: any) => (
               <div key={p.id} className="flex items-center justify-between p-4">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">
+                  <p className="truncate text-sm font-medium text-slate-900">
                     {p.description}
                   </p>
-                  <p className="text-xs text-slate-500 truncate">
+                  <p className="truncate text-xs text-slate-500">
                     {p.students?.full_name ?? "—"}
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold text-slate-900">
-                    {formatCurrency(p.amount)}
+                    {formatCurrency(Number(p.amount))}
                   </p>
                   <StatusBadge status={p.status} />
                 </div>
               </div>
-            ))
-          )}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+}) {
   return (
     <div className="rounded-xl bg-white/10 px-3 py-3">
       <p className="text-2xl font-bold leading-none">{value}</p>
-      <p className="mt-1 text-[11px] uppercase tracking-wide text-white/70">{label}</p>
+      <p className="mt-1 inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-white/70">
+        {icon}
+        {label}
+      </p>
     </div>
   );
 }
 
-function QuickLink({
-  href,
-  icon,
-  label,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  label: string;
-}) {
+function FeatureTile({ feature }: { feature: FeatureKey }) {
+  const f = features[feature];
+  const Icon = f.icon;
   return (
     <Link
-      href={href}
-      className="card flex items-center justify-between p-4 active:scale-[0.98]"
+      href={f.href}
+      className="card card-hover relative flex items-center gap-3 p-4"
     >
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-          {icon}
-        </div>
-        <span className="text-sm font-medium text-slate-700">{label}</span>
+      <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${f.bgSoft} ${f.text}`}>
+        <Icon className="h-5 w-5" />
       </div>
+      <span className="flex-1 text-sm font-semibold text-slate-800">
+        {f.label}
+      </span>
       <ChevronRight className="h-4 w-4 text-slate-300" />
     </Link>
   );
