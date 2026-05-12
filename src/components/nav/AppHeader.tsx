@@ -3,6 +3,8 @@ import { School as SchoolIcon } from "lucide-react";
 import { getSessionProfile } from "@/lib/auth";
 import { getCurrentSchool } from "@/lib/school";
 import { fetchNotifications } from "@/lib/notifications";
+import { APP_BUILD_LABEL } from "@/lib/version";
+import { LogoutButton } from "./LogoutButton";
 import { NotificationBell } from "./NotificationBell";
 import { UserMenu } from "./UserMenu";
 
@@ -33,8 +35,14 @@ export async function AppHeader() {
             <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400 leading-none">
               {subtitle}
             </p>
-            <p className="mt-0.5 truncate text-sm font-semibold text-slate-900 leading-tight">
-              {school?.name ?? "Madrasati"}
+            <p className="mt-0.5 flex items-center gap-1.5 truncate text-sm font-semibold text-slate-900 leading-tight">
+              <span className="truncate">{school?.name ?? "Madrasati"}</span>
+              <span
+                className="shrink-0 rounded-full bg-brand-50 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-brand-700"
+                title={APP_BUILD_LABEL}
+              >
+                {APP_BUILD_LABEL}
+              </span>
             </p>
           </div>
         </Link>
@@ -42,6 +50,7 @@ export async function AppHeader() {
         <div className="flex items-center gap-2">
           <NotificationBell items={notifications} />
           <UserMenu fullName={profile.full_name} email={email} role={profile.role} />
+          <LogoutButton />
         </div>
       </div>
     </div>

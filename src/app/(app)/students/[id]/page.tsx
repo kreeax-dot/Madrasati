@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ClipboardList, KeyRound, Wallet } from "lucide-react";
-import { TopBar } from "@/components/nav/TopBar";
+import { ArrowLeft, ClipboardList, Repeat, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
-import { formatCurrency, formatDate, initials } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { StudentQuickActions } from "@/components/director/StudentQuickActions";
+import { StudentAvatarEditor } from "@/components/director/StudentAvatarEditor";
 
 export default async function StudentDetailPage({
   params,
@@ -17,12 +17,17 @@ export default async function StudentDetailPage({
 
   const { data: student } = await supabase
     .from("students")
-    .select("id, full_name, class_id, date_of_birth, classes(name)")
+    .select("id, full_name, class_id, date_of_birth, avatar_url, classes(name)")
     .eq("id", params.id)
     .maybeSingle();
   if (!student) notFound();
 
-  const [{ data: payments }, { data: absences }, { data: code }] = await Promise.all([
+  const [
+    { data: payments },
+    { data: absences },
+    { data: code },
+    { data: remedials },
+  ] = await Promise.all([
     supabase
       .from("payments")
       .select("id, amount, status, due_date, description")
@@ -41,6 +46,11 @@ export default async function StudentDetailPage({
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from("remedials")
+      .select("id, session_date, duration_minutes, reason")
+      .eq("student_id", params.id)
+      .order("session_date", { ascending: false }),
   ]);
 
   return (
@@ -52,10 +62,12 @@ export default async function StudentDetailPage({
         <ArrowLeft className="h-5 w-5" />
       </Link>
 
-      <header className="flex items-center gap-3">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-lg font-bold text-brand-700">
-          {initials(student.full_name)}
-        </div>
+      <header className="space-y-3">
+        <StudentAvatarEditor
+          studentId={student.id}
+          fullName={student.full_name}
+          avatarUrl={(student as any).avatar_url ?? null}
+        />
         <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
             Élève
@@ -135,6 +147,36 @@ export default async function StudentDetailPage({
           </ul>
         )}
       </section>
+
+      <section>
+        <div className="mb-2 flex items-center gap-2">
+          <Repeat className="h-4 w-4 text-slate-400" />
+          <h2 className="text-sm font-semibold text-slate-700">Rattrapages</h2>
+        </div>
+        {(remedials ?? []).length === 0 ? (
+          <div className="card px-4 py-6 text-center text-sm text-slate-400">
+            Aucun rattrapage.
+          </div>
+        ) : (
+          <ul className="card divide-y divide-slate-100">
+            {remedials!.map((r) => (
+              <li key={r.id} className="flex items-center justify-between p-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-slate-900">
+                    {r.reason ?? "Rattrapage"}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {formatDate(r.session_date)}
+                  </p>
+                </div>
+                <span className="badge-blue shrink-0">
+                  {formatDuration(r.duration_minutes)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
@@ -143,4 +185,13 @@ function StatusBadge({ status }: { status: string }) {
   if (status === "paid") return <span className="badge-green">Payé</span>;
   if (status === "overdue") return <span className="badge-red">En retard</span>;
   return <span className="badge-amber">En attente</span>;
+}
+
+function formatDuration(minutes: number) {
+  if (minutes >= 60) {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m === 0 ? `${h}h` : `${h}h${m.toString().padStart(2, "0")}`;
+  }
+  return `${minutes} min`;
 }

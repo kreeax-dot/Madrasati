@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { LogOut, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { requireRole } from "@/lib/auth";
-import { signOut } from "@/app/actions/auth";
+import { LogoutButton } from "@/components/nav/LogoutButton";
+import { APP_BUILD_LABEL } from "@/lib/version";
 
 export default async function AdminLayout({
   children,
@@ -21,20 +22,18 @@ export default async function AdminLayout({
             <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
               Super Admin
             </p>
-            <p className="text-sm font-semibold text-slate-900 leading-tight">
-              {profile.full_name}
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 leading-tight">
+              <span className="truncate">{profile.full_name}</span>
+              <span
+                className="shrink-0 rounded-full bg-brand-50 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-brand-700"
+                title={APP_BUILD_LABEL}
+              >
+                {APP_BUILD_LABEL}
+              </span>
             </p>
           </div>
         </Link>
-        <form action={signOut}>
-          <button
-            type="submit"
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-soft border border-slate-100 text-slate-600"
-            aria-label="Déconnexion"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
-        </form>
+        <LogoutButton />
       </header>
       <main className="px-5 pt-2">{children}</main>
     </div>

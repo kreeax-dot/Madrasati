@@ -25,11 +25,33 @@ export async function createClass(formData: FormData) {
 }
 
 export async function deleteClass(classId: string) {
-  await getSchoolId();
+  const schoolId = await getSchoolId();
   const supabase = createClient();
-  const { error } = await supabase.from("classes").delete().eq("id", classId);
-  if (error) throw new Error(error.message);
+
+  // Unassign students from the class so they are not lost (class_id is ON DELETE
+  // SET NULL via FK, but we do it explicitly to keep things obvious + revalidate).
+  const { error: unassignErr } = await supabase
+    .from("students")
+    .update({ class_id: null })
+    .eq("class_id", classId)
+    .eq("school_id", schoolId);
+  if (unassignErr) {
+    throw new Error(`Impossible de détacher les élèves : ${unassignErr.message}`);
+  }
+
+  // schedules / homework / exams cascade via FK on delete.
+  const { error } = await supabase
+    .from("classes")
+    .delete()
+    .eq("id", classId)
+    .eq("school_id", schoolId);
+  if (error) throw new Error(`Suppression refusée : ${error.message}`);
+
   revalidatePath("/classes");
+  revalidatePath("/students");
+  revalidatePath("/schedule");
+  revalidatePath("/homework");
+  revalidatePath("/exams");
 }
 
 async function getSchoolId() {
@@ -53,6 +75,19 @@ export async function createStudent(formData: FormData): Promise<{
   const classId = String(formData.get("class_id") ?? "") || null;
   if (!fullName) throw new Error("Nom requis");
 
+  const avatarFile = formData.get("avatar") as File | null;
+  let avatarUrl: string | null = null;
+  if (avatarFile && typeof avatarFile === "object" && "size" in avatarFile && avatarFile.size > 0) {
+    try {
+      avatarUrl = await uploadToBucket(supabase, "avatars", schoolId, avatarFile);
+    } catch (err: any) {
+      // Don't block student creation if photo upload fails — the director can
+      // re-attach a photo later from the student detail page.
+      console.warn("[createStudent] avatar upload failed:", err?.message ?? err);
+      avatarUrl = null;
+    }
+  }
+
   const { data: student, error } = await supabase
     .from("students")
     .insert({
@@ -60,6 +95,7 @@ export async function createStudent(formData: FormData): Promise<{
       full_name: fullName,
       class_id: classId,
       date_of_birth: dob,
+      avatar_url: avatarUrl,
     })
     .select("id")
     .single();
@@ -231,22 +267,29 @@ export async function createPayment(formData: FormData) {
   const amount = Number(formData.get("amount") ?? 0);
   const dueDate = String(formData.get("due_date") ?? "");
   const description = String(formData.get("description") ?? "").trim();
+  const alreadyPaid =
+    formData.get("already_paid") === "on" || formData.get("already_paid") === "true";
 
   if (!studentId || !amount || !dueDate || !description) {
     throw new Error("Champs requis");
   }
+  if (amount <= 0) throw new Error("Montant invalide");
 
-  const { error } = await supabase.from("payments").insert({
+  const row: Record<string, any> = {
     school_id: schoolId,
     student_id: studentId,
     amount,
     due_date: dueDate,
     description,
-    status: "pending",
-  });
+    status: alreadyPaid ? "paid" : "pending",
+  };
+  if (alreadyPaid) row.paid_at = new Date().toISOString();
+
+  const { error } = await supabase.from("payments").insert(row);
   if (error) throw new Error(error.message);
 
   revalidatePath("/payments");
+  revalidatePath(`/students/${studentId}`);
 }
 
 export async function markPaymentPaid(paymentId: string) {
@@ -260,6 +303,199 @@ export async function markPaymentPaid(paymentId: string) {
   revalidatePath("/payments");
 }
 
+// ─── STUDENT AVATAR ───────────────────────────────────────────────────────────
+export async function updateStudentAvatar(formData: FormData) {
+  const schoolId = await getSchoolId();
+  const supabase = createClient();
+
+  const studentId = String(formData.get("student_id") ?? "");
+  const file = formData.get("avatar") as File | null;
+  if (!studentId) throw new Error("Élève requis");
+  if (!file || !("size" in file) || file.size === 0) throw new Error("Image requise");
+
+  const url = await uploadToBucket(supabase, "avatars", schoolId, file);
+
+  const { error } = await supabase
+    .from("students")
+    .update({ avatar_url: url })
+    .eq("id", studentId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/students/${studentId}`);
+  revalidatePath("/students");
+  revalidatePath("/dashboard");
+}
+
+export async function removeStudentAvatar(studentId: string) {
+  await getSchoolId();
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("students")
+    .update({ avatar_url: null })
+    .eq("id", studentId);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/students/${studentId}`);
+  revalidatePath("/students");
+  revalidatePath("/dashboard");
+}
+
+// ─── REMEDIALS (RATTRAPAGES) ──────────────────────────────────────────────────
+export async function createRemedial(formData: FormData) {
+  const schoolId = await getSchoolId();
+  const supabase = createClient();
+  const { profile } = await requireRole(["director"]);
+
+  const studentId = String(formData.get("student_id") ?? "");
+  const date = String(formData.get("session_date") ?? "");
+  const duration = Number(formData.get("duration_minutes") ?? 0);
+  const reason = String(formData.get("reason") ?? "").trim() || null;
+
+  if (!studentId || !date) throw new Error("Champs requis");
+  if (!duration || duration <= 0) throw new Error("Durée invalide");
+
+  const { error } = await supabase.from("remedials").insert({
+    school_id: schoolId,
+    student_id: studentId,
+    session_date: date,
+    duration_minutes: duration,
+    reason,
+    created_by: profile.id,
+  });
+  if (error) {
+    if (error.message?.toLowerCase().includes("does not exist")) {
+      throw new Error(
+        "Table « remedials » introuvable. Appliquez supabase/migration_v7.sql dans Supabase.",
+      );
+    }
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/remedials");
+  revalidatePath(`/students/${studentId}`);
+}
+
+export async function deleteRemedial(id: string) {
+  await getSchoolId();
+  const supabase = createClient();
+  const { error } = await supabase.from("remedials").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/remedials");
+}
+
+// ─── EXAMS ────────────────────────────────────────────────────────────────────
+export async function createExam(formData: FormData) {
+  const schoolId = await getSchoolId();
+  const supabase = createClient();
+  const { profile } = await requireRole(["director"]);
+
+  const classId = String(formData.get("class_id") ?? "");
+  const subject = String(formData.get("subject") ?? "").trim();
+  const examDate = String(formData.get("exam_date") ?? "");
+  const description = String(formData.get("description") ?? "").trim() || null;
+
+  if (!classId || !subject || !examDate) throw new Error("Champs requis");
+
+  const { error } = await supabase.from("exams").insert({
+    school_id: schoolId,
+    class_id: classId,
+    subject,
+    exam_date: examDate,
+    description,
+    created_by: profile.id,
+  });
+  if (error) {
+    if (error.message?.toLowerCase().includes("does not exist")) {
+      throw new Error(
+        "Table « exams » introuvable. Appliquez supabase/migration_v7.sql dans Supabase.",
+      );
+    }
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/exams");
+}
+
+export async function deleteExam(id: string) {
+  await getSchoolId();
+  const supabase = createClient();
+  const { error } = await supabase.from("exams").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/exams");
+}
+
+// ─── PHOTOS (class or individual) ─────────────────────────────────────────────
+export async function uploadPhoto(formData: FormData) {
+  const schoolId = await getSchoolId();
+  const supabase = createClient();
+  const { profile } = await requireRole(["director"]);
+
+  const scope = String(formData.get("scope") ?? "");
+  const classId = String(formData.get("class_id") ?? "") || null;
+  const studentId = String(formData.get("student_id") ?? "") || null;
+  const caption = String(formData.get("caption") ?? "").trim() || null;
+  const file = formData.get("photo") as File | null;
+
+  if (!file || !("size" in file) || file.size === 0) throw new Error("Image requise");
+  if (scope === "class" && !classId) throw new Error("Classe requise");
+  if (scope === "individual" && !studentId) throw new Error("Élève requis");
+
+  const url = await uploadToBucket(supabase, "photos", schoolId, file);
+
+  const { error } = await supabase.from("photos").insert({
+    school_id: schoolId,
+    class_id: scope === "class" ? classId : null,
+    student_id: scope === "individual" ? studentId : null,
+    url,
+    caption,
+    uploaded_by: profile.id,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/photos");
+}
+
+export async function deletePhoto(id: string) {
+  await getSchoolId();
+  const supabase = createClient();
+  const { error } = await supabase.from("photos").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/photos");
+}
+
+// ─── STORAGE HELPER ───────────────────────────────────────────────────────────
+// Uses the user-scoped client so we don't depend on SUPABASE_SERVICE_ROLE_KEY.
+// Migration v5 grants directors INSERT on the avatars / photos buckets.
+async function uploadToBucket(
+  supabase: ReturnType<typeof createClient>,
+  bucket: "avatars" | "photos",
+  schoolId: string,
+  file: File,
+): Promise<string> {
+  const rawName = (file as any).name as string | undefined;
+  const ext = rawName && rawName.includes(".")
+    ? rawName.split(".").pop()!.toLowerCase()
+    : "jpg";
+  const safeExt = /^(jpe?g|png|webp|gif|avif|heic)$/i.test(ext) ? ext : "jpg";
+  const key = `${schoolId}/${crypto.randomUUID()}.${safeExt}`;
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const { error } = await supabase.storage
+    .from(bucket)
+    .upload(key, buffer, {
+      contentType: file.type || `image/${safeExt}`,
+      upsert: false,
+    });
+  if (error) {
+    throw new Error(
+      `Échec téléversement (${bucket}) : ${error.message}. ` +
+        `Vérifiez que la migration v5 a été appliquée dans Supabase.`,
+    );
+  }
+
+  const { data } = supabase.storage.from(bucket).getPublicUrl(key);
+  return data.publicUrl;
+}
+
 // ─── MESSAGES ─────────────────────────────────────────────────────────────────
 export async function sendMessage(formData: FormData) {
   const { profile } = await requireRole(["director", "parent", "student"]);
@@ -268,18 +504,108 @@ export async function sendMessage(formData: FormData) {
 
   const subject = String(formData.get("subject") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
-  const recipientId = String(formData.get("recipient_id") ?? "") || null;
+  if (!subject || !body) throw new Error("Sujet et message requis");
 
-  if (!subject || !body) throw new Error("Champs requis");
+  // scope: "student" → message a single student (+ their parent if linked)
+  //        "class"   → broadcast to every student/parent profile in a class
+  //        "broadcast" → school-wide (recipient_id = null), legacy behavior
+  const scope = String(formData.get("scope") ?? "student");
+  const studentId = String(formData.get("student_id") ?? "") || null;
+  const classId = String(formData.get("class_id") ?? "") || null;
 
-  const { error } = await supabase.from("messages").insert({
-    school_id: profile.school_id,
-    sender_id: profile.id,
-    recipient_id: recipientId,
-    subject,
-    body,
+  const recipients = await resolveRecipients(supabase, profile.school_id, {
+    scope,
+    studentId,
+    classId,
   });
+
+  // De-dupe and never send to self.
+  const finalRecipients = Array.from(new Set(recipients)).filter(
+    (id) => id && id !== profile.id,
+  );
+
+  if (finalRecipients.length === 0 && scope !== "broadcast") {
+    throw new Error(
+      "Aucun destinataire trouvé. L'élève ou sa famille doit avoir un compte (code de connexion utilisé).",
+    );
+  }
+
+  const rows =
+    finalRecipients.length > 0
+      ? finalRecipients.map((rid) => ({
+          school_id: profile.school_id!,
+          sender_id: profile.id,
+          recipient_id: rid,
+          subject,
+          body,
+        }))
+      : [
+          {
+            school_id: profile.school_id!,
+            sender_id: profile.id,
+            recipient_id: null,
+            subject,
+            body,
+          },
+        ];
+
+  const { error } = await supabase.from("messages").insert(rows);
   if (error) throw new Error(error.message);
 
+  revalidatePath("/messages");
+}
+
+async function resolveRecipients(
+  supabase: ReturnType<typeof createClient>,
+  schoolId: string,
+  opts: { scope: string; studentId: string | null; classId: string | null },
+): Promise<string[]> {
+  if (opts.scope === "broadcast") return [];
+
+  let studentIds: string[] = [];
+  if (opts.scope === "student" && opts.studentId) {
+    studentIds = [opts.studentId];
+  } else if (opts.scope === "class" && opts.classId) {
+    const { data: kids } = await supabase
+      .from("students")
+      .select("id")
+      .eq("school_id", schoolId)
+      .eq("class_id", opts.classId);
+    studentIds = (kids ?? []).map((k: any) => k.id);
+  }
+
+  if (studentIds.length === 0) return [];
+
+  // Pull students once for parent_id, then profiles linked via student_id.
+  const [{ data: students }, { data: linkedProfiles }] = await Promise.all([
+    supabase
+      .from("students")
+      .select("id, parent_id")
+      .in("id", studentIds),
+    supabase
+      .from("profiles")
+      .select("id, student_id")
+      .in("student_id", studentIds),
+  ]);
+
+  const recipients: string[] = [];
+  (students ?? []).forEach((s: any) => {
+    if (s.parent_id) recipients.push(s.parent_id);
+  });
+  (linkedProfiles ?? []).forEach((p: any) => {
+    recipients.push(p.id);
+  });
+  return recipients;
+}
+
+export async function markMessageRead(messageId: string) {
+  await requireRole(["director", "parent", "student"]);
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("messages")
+    .update({ read_at: new Date().toISOString() })
+    .eq("id", messageId)
+    .is("read_at", null);
+  if (error) throw new Error(error.message);
   revalidatePath("/messages");
 }

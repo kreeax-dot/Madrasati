@@ -10,6 +10,7 @@ type Student = {
   id: string;
   full_name: string;
   class_id: string | null;
+  avatar_url?: string | null;
   classes?: { id: string; name: string } | null;
 };
 
@@ -99,8 +100,17 @@ export function StudentsExplorer({
                     href={isDirector ? `/students/${s.id}` : "#"}
                     className="flex flex-1 items-center gap-3 min-w-0"
                   >
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-sm font-semibold text-brand-700">
-                      {initials(s.full_name)}
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-brand-50 text-sm font-semibold text-brand-700">
+                      {s.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={s.avatar_url}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        initials(s.full_name)
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-slate-900">

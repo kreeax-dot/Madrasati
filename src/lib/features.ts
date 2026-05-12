@@ -2,7 +2,10 @@ import {
   BookOpen,
   CalendarRange,
   ClipboardList,
+  GraduationCap,
+  Images,
   MessagesSquare,
+  Repeat,
   UtensilsCrossed,
   Wallet,
   type LucideIcon,
@@ -14,7 +17,10 @@ export type FeatureKey =
   | "schedule"
   | "payments"
   | "absences"
-  | "canteen";
+  | "canteen"
+  | "exams"
+  | "remedials"
+  | "photos";
 
 export const features: Record<
   FeatureKey,
@@ -88,5 +94,35 @@ export const features: Record<
     ring: "ring-amber-100",
     gradient: "from-amber-500 to-amber-700",
     href: "/canteen",
+  },
+  exams: {
+    label: "Examens",
+    icon: GraduationCap,
+    bg: "bg-rose-500",
+    bgSoft: "bg-rose-50",
+    text: "text-rose-600",
+    ring: "ring-rose-100",
+    gradient: "from-rose-500 to-rose-700",
+    href: "/exams",
+  },
+  remedials: {
+    label: "Rattrapages",
+    icon: Repeat,
+    bg: "bg-indigo-500",
+    bgSoft: "bg-indigo-50",
+    text: "text-indigo-600",
+    ring: "ring-indigo-100",
+    gradient: "from-indigo-500 to-indigo-700",
+    href: "/remedials",
+  },
+  photos: {
+    label: "Photos",
+    icon: Images,
+    bg: "bg-cyan-500",
+    bgSoft: "bg-cyan-50",
+    text: "text-cyan-600",
+    ring: "ring-cyan-100",
+    gradient: "from-cyan-500 to-cyan-700",
+    href: "/photos",
   },
 };

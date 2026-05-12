@@ -118,3 +118,36 @@ export interface Message {
   read_at: string | null;
   created_at: string;
 }
+
+export interface Exam {
+  id: string;
+  school_id: string;
+  class_id: string;
+  subject: string;
+  exam_date: string;
+  description: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface Remedial {
+  id: string;
+  school_id: string;
+  student_id: string;
+  session_date: string;
+  duration_minutes: number;
+  reason: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface Photo {
+  id: string;
+  school_id: string;
+  class_id: string | null;
+  student_id: string | null;
+  url: string;
+  caption: string | null;
+  uploaded_by: string | null;
+  created_at: string;
+}

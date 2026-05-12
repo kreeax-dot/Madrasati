@@ -98,13 +98,17 @@ export function PaymentsExplorer({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Montant (DZD)</label>
-              <input name="amount" type="number" required className="input" placeholder="12000" />
+              <input name="amount" type="number" min="1" required className="input" placeholder="12000" />
             </div>
             <div>
               <label className="label">Échéance</label>
               <input name="due_date" type="date" required className="input" />
             </div>
           </div>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" name="already_paid" className="h-4 w-4" />
+            Déjà payé (enregistrer dans l&apos;historique)
+          </label>
           {error && (
             <div className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}

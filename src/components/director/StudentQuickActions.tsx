@@ -1,14 +1,24 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, ClipboardList, Copy, KeyRound, Loader2, RefreshCw, Wallet } from "lucide-react";
+import {
+  Check,
+  ClipboardList,
+  Copy,
+  KeyRound,
+  Loader2,
+  RefreshCw,
+  Repeat,
+  Wallet,
+} from "lucide-react";
 import {
   createAbsence,
   createPayment,
+  createRemedial,
   regenerateStudentCode,
 } from "@/app/actions/director";
 
-type Sheet = null | "payment" | "absence" | "code";
+type Sheet = null | "payment" | "absence" | "code" | "remedial";
 
 export function StudentQuickActions({
   studentId,
@@ -58,6 +68,21 @@ export function StudentQuickActions({
     });
   }
 
+  function onSubmitRemedial(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    const fd = new FormData(e.currentTarget);
+    fd.set("student_id", studentId);
+    startTransition(async () => {
+      try {
+        await createRemedial(fd);
+        close();
+      } catch (err: any) {
+        setError(err?.message ?? "Erreur");
+      }
+    });
+  }
+
   function regenerate() {
     startTransition(async () => {
       try {
@@ -79,9 +104,10 @@ export function StudentQuickActions({
 
   return (
     <>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         <Action onClick={() => setSheet("payment")} icon={<Wallet className="h-4 w-4" />} label="Paiement" />
         <Action onClick={() => setSheet("absence")} icon={<ClipboardList className="h-4 w-4" />} label="Absence" />
+        <Action onClick={() => setSheet("remedial")} icon={<Repeat className="h-4 w-4" />} label="Rattrapage" />
         <Action onClick={() => setSheet("code")} icon={<KeyRound className="h-4 w-4" />} label="Code" />
       </div>
 
@@ -134,6 +160,42 @@ export function StudentQuickActions({
                 <input type="checkbox" name="justified" className="h-4 w-4" />
                 Absence justifiée
               </label>
+              {error && <Err>{error}</Err>}
+              <button type="submit" disabled={pending} className="btn-primary w-full">
+                {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Enregistrer
+              </button>
+            </form>
+          )}
+          {sheet === "remedial" && (
+            <form onSubmit={onSubmitRemedial} className="space-y-3">
+              <h3 className="text-base font-semibold">Nouveau rattrapage</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Date</label>
+                  <input name="session_date" type="date" required className="input" />
+                </div>
+                <div>
+                  <label className="label">Durée</label>
+                  <select name="duration_minutes" required className="input">
+                    <option value="60">1h</option>
+                    <option value="90">1h30</option>
+                    <option value="120">2h</option>
+                    <option value="180">3h</option>
+                    <option value="30">30 min</option>
+                    <option value="45">45 min</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="label">Motif</label>
+                <textarea
+                  name="reason"
+                  rows={3}
+                  className="input resize-none"
+                  placeholder="Chapitre 3 — fractions"
+                />
+              </div>
               {error && <Err>{error}</Err>}
               <button type="submit" disabled={pending} className="btn-primary w-full">
                 {pending && <Loader2 className="h-4 w-4 animate-spin" />}

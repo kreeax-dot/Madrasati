@@ -16,7 +16,7 @@ export async function fetchNotifications(limit = 15): Promise<NotifItem[]> {
 
   const supabase = createClient();
 
-  const [hw, msg, pay, abs, sch] = await Promise.all([
+  const [hw, msg, pay, abs, sch, ex, rem] = await Promise.all([
     supabase
       .from("homework")
       .select("id, subject, title, created_at, classes(name)")
@@ -40,6 +40,16 @@ export async function fetchNotifications(limit = 15): Promise<NotifItem[]> {
     supabase
       .from("schedules")
       .select("id, subject, day_of_week, created_at, classes(name)")
+      .order("created_at", { ascending: false })
+      .limit(limit),
+    supabase
+      .from("exams")
+      .select("id, subject, exam_date, created_at, classes(name)")
+      .order("created_at", { ascending: false })
+      .limit(limit),
+    supabase
+      .from("remedials")
+      .select("id, session_date, duration_minutes, reason, created_at, students(full_name)")
       .order("created_at", { ascending: false })
       .limit(limit),
   ]);
@@ -93,6 +103,26 @@ export async function fetchNotifications(limit = 15): Promise<NotifItem[]> {
       title: `Cours ajouté · ${s.subject}`,
       body: s.classes?.name ?? "",
       timestamp: s.created_at,
+    });
+  });
+
+  (ex.data ?? []).forEach((e: any) => {
+    out.push({
+      id: `ex-${e.id}`,
+      feature: "exams",
+      title: `Examen · ${e.subject}`,
+      body: `${e.classes?.name ?? ""}${e.exam_date ? ` — ${e.exam_date}` : ""}`,
+      timestamp: e.created_at,
+    });
+  });
+
+  (rem.data ?? []).forEach((r: any) => {
+    out.push({
+      id: `rem-${r.id}`,
+      feature: "remedials",
+      title: "Rattrapage programmé",
+      body: `${r.students?.full_name ?? ""}${r.session_date ? ` — ${r.session_date}` : ""}`,
+      timestamp: r.created_at,
     });
   });
 

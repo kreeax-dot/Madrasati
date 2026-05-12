@@ -4,8 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/auth";
 import { getCurrentSchool } from "@/lib/school";
 import { features, type FeatureKey } from "@/lib/features";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, initials } from "@/lib/utils";
 import { Realtime } from "@/components/Realtime";
+import { MigrationBanner } from "@/components/director/MigrationBanner";
 
 export default async function DashboardPage() {
   const { profile } = await getSessionProfile();
@@ -64,23 +65,86 @@ export default async function DashboardPage() {
     schedule: true,
   }) as unknown as Record<string, boolean>;
 
-  const directorTiles: FeatureKey[] = ["schedule", "homework", "absences", "payments", "canteen", "messages"];
-  const userTiles: FeatureKey[] = ["schedule", "homework", "canteen", "absences", "payments", "messages"];
+  const directorTiles: FeatureKey[] = [
+    "schedule",
+    "homework",
+    "exams",
+    "remedials",
+    "photos",
+    "absences",
+    "payments",
+    "canteen",
+    "messages",
+  ];
+  const userTiles: FeatureKey[] = [
+    "schedule",
+    "homework",
+    "exams",
+    "remedials",
+    "photos",
+    "canteen",
+    "absences",
+    "payments",
+    "messages",
+  ];
+  const alwaysOn = new Set<FeatureKey>([
+    "homework",
+    "canteen",
+    "exams",
+    "remedials",
+    "photos",
+  ]);
   const tiles = (isDirector ? directorTiles : userTiles).filter(
-    (k) => enabled[k] !== false || k === "homework" || k === "canteen",
+    (k) => enabled[k] !== false || alwaysOn.has(k),
   );
+
+  // Fetch student avatar for student dashboard.
+  let studentAvatar: { url: string | null; name: string } | null = null;
+  if (isStudent && profile.student_id) {
+    const { data: me } = await supabase
+      .from("students")
+      .select("avatar_url, full_name")
+      .eq("id", profile.student_id)
+      .maybeSingle();
+    if (me) {
+      studentAvatar = {
+        url: (me as any).avatar_url ?? null,
+        name: (me as any).full_name ?? profile.full_name,
+      };
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <Realtime tables={["payments", "messages", "homework", "absences", "schedules", "canteen_menus"]} />
+      <Realtime tables={["payments", "messages", "homework", "absences", "schedules", "canteen_menus", "exams", "remedials", "photos"]} />
 
-      <header className="pt-1">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-          Bonjour
-        </p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
-          {profile.full_name.split(" ")[0]} 👋
-        </h1>
+      {isDirector && <MigrationBanner />}
+
+      <header className="flex items-center gap-3 pt-1">
+        {studentAvatar && (
+          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl ring-2 ring-white shadow-soft">
+            {studentAvatar.url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={studentAvatar.url}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-brand-50 text-base font-bold text-brand-700">
+                {initials(studentAvatar.name)}
+              </div>
+            )}
+          </div>
+        )}
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            Bonjour
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 truncate">
+            {(studentAvatar?.name ?? profile.full_name).split(" ")[0]} 👋
+          </h1>
+        </div>
       </header>
 
       <section className="card border-0 bg-gradient-to-br from-brand-600 to-brand-800 p-5 text-white">

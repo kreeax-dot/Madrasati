@@ -1,4 +1,4 @@
-import { Wallet } from "lucide-react";
+import { Clock, Wallet } from "lucide-react";
 import { TopBar } from "@/components/nav/TopBar";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
@@ -12,7 +12,9 @@ export default async function PaymentsPage() {
 
   const { data: payments } = await supabase
     .from("payments")
-    .select("id, amount, status, due_date, paid_at, description, student_id, students(full_name)")
+    .select(
+      "id, amount, status, due_date, paid_at, description, student_id, students(full_name)",
+    )
     .order("due_date", { ascending: false });
 
   const list = (payments as any[]) ?? [];
@@ -45,10 +47,15 @@ export default async function PaymentsPage() {
     );
   }
 
-  // Parent / student view
+  // Parent / student view — clean split: upcoming (or overdue) vs history.
   const upcoming = list
     .filter((p) => p.status !== "paid")
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
+  const history = list
+    .filter((p) => p.status === "paid")
+    .sort((a, b) =>
+      (b.paid_at ?? b.due_date).localeCompare(a.paid_at ?? a.due_date),
+    );
   const next = upcoming[0];
 
   return (
@@ -56,16 +63,23 @@ export default async function PaymentsPage() {
       <Realtime tables={["payments"]} />
       <TopBar subtitle="Mes paiements" title="Paiements" />
 
-      {next && (
+      {next ? (
         <div className="card border-0 bg-gradient-to-br from-emerald-500 to-emerald-700 p-5 text-white">
           <p className="text-[11px] font-medium uppercase tracking-wide text-white/80">
             Prochaine échéance
           </p>
-          <p className="mt-2 text-3xl font-bold">{formatCurrency(Number(next.amount))}</p>
+          <p className="mt-2 text-3xl font-bold">
+            {formatCurrency(Number(next.amount))}
+          </p>
           <p className="mt-1 text-sm text-white/90">{next.description}</p>
           <p className="mt-2 text-xs text-white/80">
             À régler avant le {formatDate(next.due_date)}
           </p>
+        </div>
+      ) : (
+        <div className="card border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+          <p className="text-sm font-semibold">Aucun paiement à venir 🎉</p>
+          <p className="mt-0.5 text-xs">Tout est à jour.</p>
         </div>
       )}
 
@@ -75,36 +89,73 @@ export default async function PaymentsPage() {
       </div>
 
       <section>
-        <p className="section-title mb-2">Historique</p>
-        {list.length === 0 ? (
-          <div className="card flex flex-col items-center gap-2 px-4 py-10 text-slate-400">
-            <Wallet className="h-6 w-6" />
-            <p className="text-sm">Aucun paiement.</p>
+        <div className="mb-2 flex items-center gap-2">
+          <Clock className="h-4 w-4 text-amber-500" />
+          <h2 className="section-title">À venir</h2>
+          <span className="text-[11px] text-slate-400">· {upcoming.length}</span>
+        </div>
+        {upcoming.length === 0 ? (
+          <div className="card px-4 py-6 text-center text-sm text-slate-400">
+            Rien d&apos;exigible.
           </div>
         ) : (
           <ul className="card divide-y divide-slate-100">
-            {list.map((p) => (
-              <li key={p.id} className="flex items-center justify-between gap-3 p-4">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-900">
-                    {p.description}
-                  </p>
-                  <p className="mt-0.5 truncate text-xs text-slate-500">
-                    {p.students?.full_name ?? "—"} · {formatDate(p.due_date)}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-slate-900">
-                    {formatCurrency(Number(p.amount))}
-                  </p>
-                  <StatusBadge status={p.status} />
-                </div>
-              </li>
+            {upcoming.map((p) => (
+              <PaymentRow key={p.id} payment={p} />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <div className="mb-2 flex items-center gap-2">
+          <Wallet className="h-4 w-4 text-emerald-500" />
+          <h2 className="section-title">Historique</h2>
+          <span className="text-[11px] text-slate-400">· {history.length}</span>
+        </div>
+        {history.length === 0 ? (
+          <div className="card px-4 py-6 text-center text-sm text-slate-400">
+            Aucun paiement réglé pour le moment.
+          </div>
+        ) : (
+          <ul className="card divide-y divide-slate-100">
+            {history.map((p) => (
+              <PaymentRow key={p.id} payment={p} historic />
             ))}
           </ul>
         )}
       </section>
     </div>
+  );
+}
+
+function PaymentRow({
+  payment,
+  historic = false,
+}: {
+  payment: any;
+  historic?: boolean;
+}) {
+  return (
+    <li className="flex items-center justify-between gap-3 p-4">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium text-slate-900">
+          {payment.description}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-slate-500">
+          {payment.students?.full_name ?? "—"} ·{" "}
+          {historic && payment.paid_at
+            ? `Payé le ${formatDate(payment.paid_at)}`
+            : `Échéance ${formatDate(payment.due_date)}`}
+        </p>
+      </div>
+      <div className="text-right">
+        <p className="text-sm font-semibold text-slate-900">
+          {formatCurrency(Number(payment.amount))}
+        </p>
+        <StatusBadge status={payment.status} />
+      </div>
+    </li>
   );
 }
 

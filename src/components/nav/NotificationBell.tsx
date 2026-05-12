@@ -107,7 +107,9 @@ export function NotificationBell({ items }: { items: NotifItem[] }) {
                             </span>
                           </div>
                           {n.body && (
-                            <p className="truncate text-xs text-slate-500">{n.body}</p>
+                            <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">
+                              {n.body}
+                            </p>
                           )}
                         </div>
                         {isNew && (

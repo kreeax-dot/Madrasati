@@ -6,7 +6,15 @@ import { requireRole } from "@/lib/auth";
 import { FeatureToggles } from "@/components/admin/FeatureToggles";
 import { CreateDirectorForm } from "@/components/admin/CreateDirectorForm";
 import { ActiveToggle } from "@/components/admin/ActiveToggle";
-import type { School, SchoolFeatures } from "@/types/database";
+import { DeleteSchoolButton } from "@/components/admin/DeleteSchoolButton";
+import type { SchoolFeatures } from "@/types/database";
+
+const DEFAULT_FEATURES: SchoolFeatures = {
+  payments: true,
+  messages: true,
+  absences: true,
+  schedule: true,
+};
 
 export default async function SchoolDetailPage({
   params,
@@ -16,25 +24,40 @@ export default async function SchoolDetailPage({
   await requireRole(["super_admin"]);
   const admin = createAdminClient();
 
-  const { data: school } = await admin
+  const { data: school, error: schoolErr } = await admin
     .from("schools")
     .select("*")
     .eq("id", params.id)
-    .maybeSingle<School>();
+    .maybeSingle();
+
+  if (schoolErr) {
+    throw new Error(
+      `Impossible de charger l'école : ${schoolErr.message}. ` +
+        `Vérifiez les migrations (v2 / v6).`,
+    );
+  }
   if (!school) notFound();
 
-  const { data: directors } = await admin
-    .from("profiles")
-    .select("id, email, full_name")
-    .eq("role", "director")
-    .eq("school_id", params.id);
+  const [{ data: directors }, { count: studentsCount }] = await Promise.all([
+    admin
+      .from("profiles")
+      .select("id, email, full_name")
+      .eq("role", "director")
+      .eq("school_id", params.id),
+    admin
+      .from("students")
+      .select("id", { count: "exact", head: true })
+      .eq("school_id", params.id),
+  ]);
 
-  const features: SchoolFeatures = (school.features as SchoolFeatures) ?? {
-    payments: true,
-    messages: true,
-    absences: true,
-    schedule: true,
+  // Defensive coercion — older rows may have NULL features / is_active before
+  // migration v6 backfilled them. Never let a missing column hide the school.
+  const features: SchoolFeatures = {
+    ...DEFAULT_FEATURES,
+    ...((school as any).features ?? {}),
   };
+  const isActive =
+    (school as any).is_active === false ? false : true;
 
   return (
     <div className="space-y-6">
@@ -49,19 +72,22 @@ export default async function SchoolDetailPage({
         <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
           École
         </p>
-        <h1 className="text-2xl font-bold tracking-tight">{school.name}</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {(school as any).name}
+        </h1>
         <p className="mt-1 text-sm text-slate-500">
-          {school.address ?? "Aucune adresse"} · {school.phone ?? "—"}
+          {(school as any).address ?? "Aucune adresse"} ·{" "}
+          {(school as any).phone ?? "—"}
         </p>
       </div>
 
-      <ActiveToggle schoolId={school.id} active={school.is_active} />
+      <ActiveToggle schoolId={(school as any).id} active={isActive} />
 
       <section>
         <h2 className="mb-3 text-sm font-semibold text-slate-700">
           Fonctionnalités activées
         </h2>
-        <FeatureToggles schoolId={school.id} initial={features} />
+        <FeatureToggles schoolId={(school as any).id} initial={features} />
       </section>
 
       <section>
@@ -95,7 +121,17 @@ export default async function SchoolDetailPage({
         <h2 className="mb-3 text-sm font-semibold text-slate-700">
           Créer un directeur
         </h2>
-        <CreateDirectorForm schoolId={school.id} />
+        <CreateDirectorForm schoolId={(school as any).id} />
+      </section>
+
+      <section className="pt-2">
+        <h2 className="mb-3 text-sm font-semibold text-red-700">Zone de danger</h2>
+        <DeleteSchoolButton
+          schoolId={(school as any).id}
+          schoolName={(school as any).name}
+          studentsCount={studentsCount ?? 0}
+          directorsCount={(directors ?? []).length}
+        />
       </section>
     </div>
   );

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Check, Copy, Loader2, UserPlus } from "lucide-react";
 import { createStudent } from "@/app/actions/director";
+import { AvatarPicker } from "./AvatarPicker";
 
 export function NewStudentForm({
   classes,
@@ -86,6 +87,10 @@ export function NewStudentForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      <div className="card p-4">
+        <p className="label">Photo de profil</p>
+        <AvatarPicker name="avatar" />
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="label">Prénom</label>

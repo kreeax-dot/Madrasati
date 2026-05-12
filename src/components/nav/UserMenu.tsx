@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { LogOut, User as UserIcon, X } from "lucide-react";
-import { signOut } from "@/app/actions/auth";
+import { X } from "lucide-react";
+import { LogoutButton } from "./LogoutButton";
 import { initials } from "@/lib/utils";
 import type { UserRole } from "@/types/database";
 
@@ -75,15 +75,9 @@ export function UserMenu({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <form action={signOut} className="p-2">
-              <button
-                type="submit"
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-red-600 hover:bg-red-50"
-              >
-                <LogOut className="h-4 w-4" />
-                Se déconnecter
-              </button>
-            </form>
+            <div className="p-2">
+              <LogoutButton variant="menu" />
+            </div>
           </div>
         </>
       )}
