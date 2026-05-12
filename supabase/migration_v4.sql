@@ -1,5 +1,33 @@
--- Madrasati v4: canteen menus. Idempotent.
+-- Madrasati v4: canteen menus + (re)create RLS helper functions. Idempotent.
 
+-- ─── ENUM (idempotent) ───────────────────────────────────────────────────────
+do $$ begin
+  create type public.user_role as enum ('super_admin', 'director', 'parent', 'student');
+exception when duplicate_object then null; end $$;
+
+-- ─── HELPER FUNCTIONS (re-create in case they were dropped) ──────────────────
+create or replace function public.current_role_value() returns user_role
+language sql stable security definer set search_path = public as $$
+  select role from public.profiles where id = auth.uid();
+$$;
+
+create or replace function public.current_school_id() returns uuid
+language sql stable security definer set search_path = public as $$
+  select school_id from public.profiles where id = auth.uid();
+$$;
+
+create or replace function public.is_super_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.profiles where id = auth.uid() and role = 'super_admin'
+  );
+$$;
+
+grant execute on function public.current_role_value() to authenticated, anon;
+grant execute on function public.current_school_id() to authenticated, anon;
+grant execute on function public.is_super_admin()    to authenticated, anon;
+
+-- ─── CANTEEN MENUS ───────────────────────────────────────────────────────────
 create table if not exists canteen_menus (
   id          uuid primary key default uuid_generate_v4(),
   school_id   uuid not null references schools(id) on delete cascade,
@@ -20,14 +48,17 @@ alter table canteen_menus enable row level security;
 drop policy if exists "canteen_select" on canteen_menus;
 create policy "canteen_select" on canteen_menus for select
   using (
-    is_super_admin()
-    or school_id = current_school_id()
+    public.is_super_admin()
+    or school_id = public.current_school_id()
     or exists (
-      select 1 from students s
+      select 1 from public.students s
       where s.school_id = canteen_menus.school_id
         and (
           s.parent_id = auth.uid()
-          or exists (select 1 from profiles p where p.id = auth.uid() and p.student_id = s.id)
+          or exists (
+            select 1 from public.profiles p
+            where p.id = auth.uid() and p.student_id = s.id
+          )
         )
     )
   );
@@ -35,15 +66,15 @@ create policy "canteen_select" on canteen_menus for select
 drop policy if exists "canteen_director_write" on canteen_menus;
 create policy "canteen_director_write" on canteen_menus for all
   using (
-    is_super_admin()
-    or (current_role_value() = 'director' and school_id = current_school_id())
+    public.is_super_admin()
+    or (public.current_role_value() = 'director' and school_id = public.current_school_id())
   )
   with check (
-    is_super_admin()
-    or (current_role_value() = 'director' and school_id = current_school_id())
+    public.is_super_admin()
+    or (public.current_role_value() = 'director' and school_id = public.current_school_id())
   );
 
--- Realtime
+-- ─── REALTIME ────────────────────────────────────────────────────────────────
 do $$
 begin
   alter publication supabase_realtime add table canteen_menus;
