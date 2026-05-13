@@ -18,7 +18,7 @@ export async function redeemCodeAndCreateAccount(formData: FormData): Promise<{
 
   const { data: codeRow, error: codeErr } = await admin
     .from("student_codes")
-    .select("id, student_id, school_id, used_at, expires_at, students(full_name, school_id)")
+    .select("id, student_id, school_id, used_at, expires_at")
     .eq("code", code)
     .maybeSingle();
 
@@ -29,7 +29,13 @@ export async function redeemCodeAndCreateAccount(formData: FormData): Promise<{
     return { ok: false, error: "Code expiré" };
   }
 
-  const fullName = (codeRow.students as any)?.full_name ?? "Élève";
+  // Resolve the student's name with a separate query — no embedded FK join.
+  const { data: student } = await admin
+    .from("students")
+    .select("full_name")
+    .eq("id", codeRow.student_id)
+    .maybeSingle();
+  const fullName = (student as any)?.full_name ?? "Élève";
 
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email,

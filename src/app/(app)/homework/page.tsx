@@ -9,22 +9,28 @@ export default async function HomeworkPage() {
   const { profile } = await requireRole(["director", "parent", "student"]);
   const supabase = createClient();
 
-  const [{ data: classes }, { data: homework }] = await Promise.all([
+  const [{ data: classesRaw }, { data: homeworkRaw }] = await Promise.all([
     supabase.from("classes").select("id, name").order("name"),
     supabase
       .from("homework")
-      .select("id, class_id, subject, title, description, due_date, classes(name)")
+      .select("id, class_id, subject, title, description, due_date")
       .order("due_date", { ascending: true }),
   ]);
+
+  const classes = (classesRaw as any[]) ?? [];
+  const classNameById = new Map<string, string>(
+    classes.map((c: any) => [c.id, c.name]),
+  );
+  const homework = ((homeworkRaw as any[]) ?? []).map((h: any) => ({
+    ...h,
+    classes: h.class_id ? { name: classNameById.get(h.class_id) ?? "" } : null,
+  }));
 
   if (profile.role === "director") {
     return (
       <div className="space-y-5">
         <TopBar subtitle="Devoirs" title="Devoirs à donner" />
-        <HomeworkEditor
-          classes={(classes as any[]) ?? []}
-          homework={(homework as any[]) ?? []}
-        />
+        <HomeworkEditor classes={classes} homework={homework} />
       </div>
     );
   }
@@ -33,13 +39,13 @@ export default async function HomeworkPage() {
     <div className="space-y-5">
       <Realtime tables={["homework"]} />
       <TopBar subtitle="Devoirs" title="À faire" />
-      {(homework ?? []).length === 0 ? (
+      {homework.length === 0 ? (
         <div className="card px-4 py-10 text-center text-sm text-slate-400">
           Aucun devoir pour le moment.
         </div>
       ) : (
         <ul className="space-y-3">
-          {homework!.map((h: any) => {
+          {homework.map((h: any) => {
             const due = new Date(h.due_date);
             const isPast = due < new Date(new Date().toDateString());
             return (

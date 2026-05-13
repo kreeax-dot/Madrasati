@@ -9,7 +9,7 @@ import { NotificationBell } from "./NotificationBell";
 import { UserMenu } from "./UserMenu";
 
 export async function AppHeader() {
-  const [{ profile, email }, school, notifications] = await Promise.all([
+  const [{ profile, userId, email }, school, notifications] = await Promise.all([
     getSessionProfile(),
     getCurrentSchool(),
     fetchNotifications(),
@@ -48,7 +48,7 @@ export async function AppHeader() {
         </Link>
 
         <div className="flex items-center gap-2">
-          <NotificationBell items={notifications} />
+          <NotificationBell items={notifications} userId={userId} />
           <UserMenu fullName={profile.full_name} email={email} role={profile.role} />
           <LogoutButton />
         </div>

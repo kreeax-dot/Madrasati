@@ -10,14 +10,34 @@ export default async function PaymentsPage() {
   const { profile } = await requireRole(["director", "parent", "student"]);
   const supabase = createClient();
 
-  const { data: payments } = await supabase
+  const { data: paymentsRaw } = await supabase
     .from("payments")
     .select(
-      "id, amount, status, due_date, paid_at, description, student_id, students(full_name)",
+      "id, amount, status, due_date, paid_at, description, student_id",
     )
     .order("due_date", { ascending: false });
 
-  const list = (payments as any[]) ?? [];
+  const rawList = (paymentsRaw as any[]) ?? [];
+  // Resolve student names via a separate query — avoids embedded-join crashes.
+  let studentNameById = new Map<string, string>();
+  if (rawList.length > 0) {
+    const ids = Array.from(
+      new Set(rawList.map((p) => p.student_id).filter(Boolean)),
+    );
+    if (ids.length > 0) {
+      const { data: sts } = await supabase
+        .from("students")
+        .select("id, full_name")
+        .in("id", ids);
+      (sts ?? []).forEach((s: any) => studentNameById.set(s.id, s.full_name));
+    }
+  }
+  const list = rawList.map((p) => ({
+    ...p,
+    students: p.student_id
+      ? { full_name: studentNameById.get(p.student_id) ?? "—" }
+      : null,
+  }));
   const totals = list.reduce(
     (acc, p) => {
       if (p.status === "paid") acc.paid += Number(p.amount);

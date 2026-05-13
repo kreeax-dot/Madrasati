@@ -47,16 +47,53 @@ export default async function DashboardPage() {
       .is("read_at", null),
     supabase
       .from("homework")
-      .select("id, subject, title, due_date, classes(name)")
+      .select("id, subject, title, due_date, class_id")
       .gte("due_date", new Date().toISOString().slice(0, 10))
       .order("due_date")
       .limit(2),
     supabase
       .from("payments")
-      .select("id, amount, status, due_date, description, students(full_name)")
+      .select("id, amount, status, due_date, description, student_id")
       .order("created_at", { ascending: false })
       .limit(3),
   ]);
+
+  // Resolve class names + student names separately to avoid embedded-join
+  // FK ambiguity (the previous syntax silently returned nulls on some
+  // schema variants).
+  const hwList = ((nextHomework as any[]) ?? []) as any[];
+  const payList = ((recentPayments as any[]) ?? []) as any[];
+  const classIds = Array.from(
+    new Set(hwList.map((h) => h.class_id).filter(Boolean)),
+  );
+  const studentIds = Array.from(
+    new Set(payList.map((p) => p.student_id).filter(Boolean)),
+  );
+  const [classNamesRes, studentNamesRes] = await Promise.all([
+    classIds.length > 0
+      ? supabase.from("classes").select("id, name").in("id", classIds)
+      : Promise.resolve({ data: [] as any[] }),
+    studentIds.length > 0
+      ? supabase
+          .from("students")
+          .select("id, full_name")
+          .in("id", studentIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ]);
+  const classNameById = new Map<string, string>(
+    ((classNamesRes as any).data ?? []).map((c: any) => [c.id, c.name]),
+  );
+  const studentNameById = new Map<string, string>(
+    ((studentNamesRes as any).data ?? []).map((s: any) => [s.id, s.full_name]),
+  );
+  hwList.forEach((h) => {
+    h.classes = h.class_id ? { name: classNameById.get(h.class_id) ?? "" } : null;
+  });
+  payList.forEach((p) => {
+    p.students = p.student_id
+      ? { full_name: studentNameById.get(p.student_id) ?? "—" }
+      : null;
+  });
 
   const enabled = (school?.features ?? {
     payments: true,
@@ -179,7 +216,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {!isDirector && (nextHomework ?? []).length > 0 && (
+      {!isDirector && hwList.length > 0 && (
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="section-title">Prochains devoirs</h2>
@@ -188,7 +225,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
           <ul className="space-y-2">
-            {nextHomework!.map((h: any) => (
+            {hwList.map((h: any) => (
               <li key={h.id} className="card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -207,7 +244,7 @@ export default async function DashboardPage() {
         </section>
       )}
 
-      {(recentPayments ?? []).length > 0 && (
+      {payList.length > 0 && (
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="section-title">Derniers paiements</h2>
@@ -216,7 +253,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
           <div className="card divide-y divide-slate-100">
-            {recentPayments!.map((p: any) => (
+            {payList.map((p: any) => (
               <div key={p.id} className="flex items-center justify-between p-4">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-slate-900">

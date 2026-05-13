@@ -17,10 +17,21 @@ export default async function StudentDetailPage({
 
   const { data: student } = await supabase
     .from("students")
-    .select("id, full_name, class_id, date_of_birth, avatar_url, classes(name)")
+    .select("id, full_name, class_id, date_of_birth, avatar_url")
     .eq("id", params.id)
     .maybeSingle();
   if (!student) notFound();
+
+  let className: string | null = null;
+  if ((student as any).class_id) {
+    const { data: cls } = await supabase
+      .from("classes")
+      .select("name")
+      .eq("id", (student as any).class_id)
+      .maybeSingle();
+    className = (cls as any)?.name ?? null;
+  }
+  (student as any).classes = className ? { name: className } : null;
 
   const [
     { data: payments },

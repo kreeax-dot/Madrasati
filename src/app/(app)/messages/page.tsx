@@ -9,28 +9,60 @@ export default async function MessagesPage() {
   const { profile } = await requireRole(["director", "parent", "student"]);
   const supabase = createClient();
 
-  const { data: messages } = await supabase
+  // We resolve sender names with a separate query (instead of an embedded
+  // FK join) so a renamed/missing FK constraint can never crash this page —
+  // which used to render as "An error occurred in server components render".
+  const { data: messagesRaw } = await supabase
     .from("messages")
-    .select(
-      "id, subject, body, read_at, created_at, sender:profiles!messages_sender_id_fkey(full_name)",
-    )
+    .select("id, sender_id, subject, body, read_at, created_at")
     .order("created_at", { ascending: false });
 
-  const list = (messages as any[]) ?? [];
+  const rawList = (messagesRaw as any[]) ?? [];
+
+  let senderById = new Map<string, string>();
+  if (rawList.length > 0) {
+    const ids = Array.from(
+      new Set(rawList.map((m) => m.sender_id).filter(Boolean)),
+    );
+    if (ids.length > 0) {
+      const { data: senders } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", ids);
+      (senders ?? []).forEach((s: any) => senderById.set(s.id, s.full_name));
+    }
+  }
+
+  const list = rawList.map((m) => ({
+    id: m.id,
+    subject: m.subject,
+    body: m.body,
+    read_at: m.read_at,
+    created_at: m.created_at,
+    sender: m.sender_id
+      ? { full_name: senderById.get(m.sender_id) ?? "Système" }
+      : null,
+  }));
+
   const isDirector = profile.role === "director";
 
   let classes: { id: string; name: string }[] = [];
   let students: { id: string; full_name: string; class_id: string | null }[] = [];
-  if (isDirector) {
-    const [{ data: cls }, { data: st }] = await Promise.all([
-      supabase.from("classes").select("id, name").order("name"),
+  if (isDirector && profile.school_id) {
+    const [clsRes, stRes] = await Promise.all([
+      supabase
+        .from("classes")
+        .select("id, name")
+        .eq("school_id", profile.school_id)
+        .order("name"),
       supabase
         .from("students")
         .select("id, full_name, class_id")
+        .eq("school_id", profile.school_id)
         .order("full_name"),
     ]);
-    classes = (cls as any[]) ?? [];
-    students = (st as any[]) ?? [];
+    classes = (clsRes.data as any[]) ?? [];
+    students = (stRes.data as any[]) ?? [];
   }
 
   return (

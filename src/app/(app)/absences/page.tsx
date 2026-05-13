@@ -9,15 +9,35 @@ export default async function AbsencesPage() {
   const { profile } = await requireRole(["director", "parent", "student"]);
   const supabase = createClient();
 
-  const { data: absences } = await supabase
+  const { data: absencesRaw } = await supabase
     .from("absences")
-    .select("id, date, reason, justified, students(full_name)")
+    .select("id, date, reason, justified, student_id")
     .order("date", { ascending: false });
 
   const isDirector = profile.role === "director";
   const { data: students } = isDirector
     ? await supabase.from("students").select("id, full_name").order("full_name")
     : { data: [] as any[] };
+
+  // Resolve student names without the embedded FK join.
+  const rawList = (absencesRaw as any[]) ?? [];
+  let studentNameById = new Map<string, string>();
+  const ids = Array.from(
+    new Set(rawList.map((a) => a.student_id).filter(Boolean)),
+  );
+  if (ids.length > 0) {
+    const { data: sts } = await supabase
+      .from("students")
+      .select("id, full_name")
+      .in("id", ids);
+    (sts ?? []).forEach((s: any) => studentNameById.set(s.id, s.full_name));
+  }
+  const absences = rawList.map((a) => ({
+    ...a,
+    students: a.student_id
+      ? { full_name: studentNameById.get(a.student_id) ?? "—" }
+      : null,
+  }));
 
   return (
     <div className="space-y-5">
@@ -27,12 +47,12 @@ export default async function AbsencesPage() {
       {isDirector && <AbsenceCreator students={(students as any[]) ?? []} />}
 
       <ul className="card divide-y divide-slate-100">
-        {(absences ?? []).length === 0 ? (
+        {absences.length === 0 ? (
           <li className="px-4 py-10 text-center text-sm text-slate-400">
             Aucune absence enregistrée.
           </li>
         ) : (
-          absences!.map((a: any) => (
+          absences.map((a: any) => (
             <li key={a.id} className="flex items-center gap-3 p-4">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-slate-900">

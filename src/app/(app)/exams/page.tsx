@@ -10,29 +10,36 @@ export default async function ExamsPage() {
   const { profile } = await requireRole(["director", "parent", "student"]);
   const supabase = createClient();
 
-  const [{ data: classes }, { data: exams }] = await Promise.all([
+  const [{ data: classesRaw }, { data: examsRaw }] = await Promise.all([
     supabase.from("classes").select("id, name").order("name"),
     supabase
       .from("exams")
-      .select("id, class_id, subject, exam_date, description, classes(name)")
+      .select("id, class_id, subject, exam_date, description")
       .order("exam_date", { ascending: true }),
   ]);
+
+  const classes = (classesRaw as any[]) ?? [];
+  const examsList = (examsRaw as any[]) ?? [];
+  const classNameById = new Map<string, string>(
+    classes.map((c: any) => [c.id, c.name]),
+  );
+  const exams = examsList.map((e: any) => ({
+    ...e,
+    classes: e.class_id ? { name: classNameById.get(e.class_id) ?? "" } : null,
+  }));
 
   if (profile.role === "director") {
     return (
       <div className="space-y-5">
         <Realtime tables={["exams"]} />
         <TopBar subtitle="Évaluations" title="Examens" />
-        <ExamEditor
-          classes={(classes as any[]) ?? []}
-          exams={(exams as any[]) ?? []}
-        />
+        <ExamEditor classes={classes} exams={exams} />
       </div>
     );
   }
 
   // Filter for parent/student to their class only.
-  let visible = (exams as any[]) ?? [];
+  let visible = exams;
   if (profile.role === "parent") {
     const { data: kids } = await supabase
       .from("students")
