@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Users, GraduationCap } from "lucide-react";
+import { Users, GraduationCap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/auth";
 import { getCurrentSchool } from "@/lib/school";
@@ -157,38 +157,47 @@ export default async function DashboardPage() {
 
       {isDirector && <MigrationBanner />}
 
-      <header className="flex items-center gap-3 pt-1">
-        {studentAvatar && (
-          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl ring-2 ring-white shadow-soft">
-            {studentAvatar.url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={studentAvatar.url}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-brand-50 text-base font-bold text-brand-700">
-                {initials(studentAvatar.name)}
-              </div>
-            )}
-          </div>
-        )}
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            Bonjour
-          </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 truncate">
-            {(studentAvatar?.name ?? profile.full_name).split(" ")[0]} 👋
-          </h1>
-        </div>
-      </header>
+      {/* Hero "Hello" card — full-width gradient block inspired by the
+          design mockups (Hello Anastasia / soft search bar). */}
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-500 via-brand-600 to-brand-800 p-5 text-white shadow-tile animate-slide-up">
+        {/* Decorative blobs */}
+        <span
+          className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10"
+          aria-hidden
+        />
+        <span
+          className="pointer-events-none absolute -bottom-6 -right-3 h-20 w-20 rounded-full bg-white/10"
+          aria-hidden
+        />
 
-      <section className="card border-0 bg-gradient-to-br from-brand-600 to-brand-800 p-5 text-white">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">
-          {isDirector ? "Vue d'ensemble" : "Aperçu"}
-        </p>
-        <div className="mt-3 grid grid-cols-3 gap-3">
+        <div className="relative flex items-center gap-3">
+          {studentAvatar && (
+            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl ring-2 ring-white/40 shadow-soft">
+              {studentAvatar.url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={studentAvatar.url}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-white/20 text-base font-bold text-white">
+                  {initials(studentAvatar.name)}
+                </div>
+              )}
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-white/70">
+              Bonjour
+            </p>
+            <h1 className="mt-0.5 text-2xl font-bold leading-tight tracking-tight truncate">
+              {(studentAvatar?.name ?? profile.full_name).split(" ")[0]} 👋
+            </h1>
+          </div>
+        </div>
+
+        <div className="relative mt-4 grid grid-cols-3 gap-3">
           <Stat
             icon={<Users className="h-3.5 w-3.5 text-white/70" />}
             label={isDirector ? "Élèves" : isStudent ? "Profil" : "Enfants"}
@@ -208,8 +217,13 @@ export default async function DashboardPage() {
       </section>
 
       <section>
-        <h2 className="section-title mb-3">Accès rapide</h2>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="text-base font-bold text-slate-900">Mes accès</h2>
+          <span className="text-xs font-medium text-slate-400">
+            {tiles.length} modules
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {tiles.map((k) => (
             <FeatureTile key={k} feature={k} />
           ))}
@@ -288,9 +302,9 @@ function Stat({
   value: number;
 }) {
   return (
-    <div className="rounded-xl bg-white/10 px-3 py-3">
+    <div className="rounded-2xl bg-white/15 px-3 py-3 backdrop-blur-sm ring-1 ring-white/10">
       <p className="text-2xl font-bold leading-none">{value}</p>
-      <p className="mt-1 inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-white/70">
+      <p className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-white/80">
         {icon}
         {label}
       </p>
@@ -304,15 +318,26 @@ function FeatureTile({ feature }: { feature: FeatureKey }) {
   return (
     <Link
       href={f.href}
-      className="card card-hover relative flex items-center gap-3 p-4"
+      className={`relative flex aspect-square flex-col justify-between overflow-hidden rounded-2xl bg-gradient-to-br ${f.gradient} p-3.5 text-white shadow-tile transition active:scale-[0.97]`}
     >
-      <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${f.bgSoft} ${f.text}`}>
+      {/* Decorative blob — abstract organic shape echoing the design mockups. */}
+      <span
+        className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-white/15"
+        aria-hidden
+      />
+      <span
+        className="pointer-events-none absolute -bottom-4 -left-3 h-14 w-14 rounded-full bg-black/10"
+        aria-hidden
+      />
+      <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-white/25 backdrop-blur-sm">
         <Icon className="h-5 w-5" />
       </div>
-      <span className="flex-1 text-sm font-semibold text-slate-800">
-        {f.label}
-      </span>
-      <ChevronRight className="h-4 w-4 text-slate-300" />
+      <div className="relative">
+        <p className="text-[10px] font-medium uppercase tracking-wider text-white/70">
+          Madrasati
+        </p>
+        <p className="mt-0.5 text-sm font-bold leading-tight">{f.label}</p>
+      </div>
     </Link>
   );
 }

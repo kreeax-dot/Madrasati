@@ -26,16 +26,16 @@ export async function AppHeader() {
 
   return (
     <div className="sticky top-0 z-20 w-full bg-slate-50/85 backdrop-blur safe-top">
-      <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 px-5 py-3">
+      <div className="mx-auto flex w-full max-w-md items-center justify-between gap-2 px-5 py-3">
         <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-soft">
-            <SchoolIcon className="h-4 w-4" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-tile">
+            <SchoolIcon className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400 leading-none">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 leading-none">
               {subtitle}
             </p>
-            <p className="mt-0.5 flex items-center gap-1.5 truncate text-sm font-semibold text-slate-900 leading-tight">
+            <p className="mt-0.5 flex items-center gap-1.5 truncate text-sm font-bold text-slate-900 leading-tight">
               <span className="truncate">{school?.name ?? "Madrasati"}</span>
               <span
                 className="shrink-0 rounded-full bg-brand-50 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-brand-700"

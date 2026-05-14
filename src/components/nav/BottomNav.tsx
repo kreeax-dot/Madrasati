@@ -54,21 +54,24 @@ export function BottomNav({ role }: { role: UserRole }) {
           : parentItems;
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-md border-t border-slate-100 bg-white/95 backdrop-blur safe-bottom">
+    <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-md bg-white/95 backdrop-blur shadow-nav safe-bottom">
       <ul
-        className="grid"
+        className="grid px-2 pt-2"
         style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
       >
         {items.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
-            <li key={href}>
+            <li key={href} className="flex justify-center">
               <Link
                 href={href}
                 className={cn(
-                  "flex flex-col items-center gap-1 px-2 py-3 text-[11px] font-medium transition",
-                  active ? "text-brand-600" : "text-slate-500",
+                  "flex w-full max-w-[88px] flex-col items-center gap-0.5 rounded-2xl px-1.5 py-2 transition",
+                  active
+                    ? "bg-brand-50 text-brand-700"
+                    : "text-slate-500 active:bg-slate-50",
                 )}
+                aria-current={active ? "page" : undefined}
               >
                 <Icon
                   className={cn(
@@ -76,7 +79,14 @@ export function BottomNav({ role }: { role: UserRole }) {
                     active ? "stroke-[2.4]" : "stroke-[1.8]",
                   )}
                 />
-                <span>{label}</span>
+                <span
+                  className={cn(
+                    "text-[10px] tracking-tight",
+                    active ? "font-semibold" : "font-medium",
+                  )}
+                >
+                  {label}
+                </span>
               </Link>
             </li>
           );

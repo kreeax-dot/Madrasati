@@ -34,6 +34,19 @@ const config: Config = {
       boxShadow: {
         soft: "0 2px 12px rgba(15, 23, 42, 0.06)",
         card: "0 4px 24px rgba(15, 23, 42, 0.08)",
+        tile: "0 8px 28px rgba(31, 66, 245, 0.14)",
+        nav: "0 -4px 24px rgba(15, 23, 42, 0.06)",
+      },
+      keyframes: {
+        "fade-in": { from: { opacity: "0" }, to: { opacity: "1" } },
+        "slide-up": {
+          from: { transform: "translateY(8px)", opacity: "0" },
+          to: { transform: "translateY(0)", opacity: "1" },
+        },
+      },
+      animation: {
+        "fade-in": "fade-in 200ms ease-out",
+        "slide-up": "slide-up 280ms cubic-bezier(0.2, 0.7, 0.3, 1)",
       },
     },
   },

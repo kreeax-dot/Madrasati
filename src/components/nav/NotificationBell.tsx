@@ -49,8 +49,6 @@ export function NotificationBell({
   );
 
   const closePanel = useCallback(() => {
-    // Always close — never gate behind anything else. Previously the panel
-    // could get stuck if localStorage threw.
     try {
       if (items[0]) {
         localStorage.setItem(storageKey, items[0].timestamp);
@@ -62,8 +60,7 @@ export function NotificationBell({
     setOpen(false);
   }, [items, storageKey]);
 
-  // ESC closes; body scroll locked while open so the page underneath doesn't
-  // feel "stuck" when the user tries to scroll the panel on mobile.
+  // ESC closes; body scroll locked while open.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -101,9 +98,13 @@ export function NotificationBell({
           role="dialog"
           aria-modal="true"
           aria-label="Notifications"
-          className="fixed inset-0 z-[60]"
+          /* Flex bottom-sheet layout: the dialog is `fixed inset-0 flex
+             items-end`, so the panel naturally sits at the bottom of the
+             VIEWPORT (not pushed above by stale `absolute bottom:0` quirks
+             that left only the footer visible on some iOS Safari builds). */
+          className="fixed inset-0 z-[60] flex items-end justify-center"
         >
-          {/* Backdrop — full screen, intercepts every tap to close. */}
+          {/* Backdrop */}
           <button
             type="button"
             onClick={closePanel}
@@ -111,20 +112,27 @@ export function NotificationBell({
             className="absolute inset-0 h-full w-full cursor-default bg-slate-900/40 backdrop-blur-sm"
           />
 
-          {/* Panel — captures its own clicks via stopPropagation. */}
+          {/* Panel */}
           <div
             onClick={(e) => e.stopPropagation()}
-            className="absolute inset-x-0 bottom-0 mx-auto flex max-h-[85dvh] w-full max-w-md flex-col rounded-t-3xl bg-white shadow-card safe-bottom"
+            className="relative flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-white shadow-card"
+            style={{
+              paddingBottom: "env(safe-area-inset-bottom)",
+            }}
           >
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+            {/* Drag handle */}
+            <div className="mx-auto mt-2 h-1.5 w-10 shrink-0 rounded-full bg-slate-200" />
+
+            {/* Header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-3">
               <div className="min-w-0">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                   Activité récente
                 </p>
-                <p className="text-base font-semibold text-slate-900">
+                <p className="text-base font-bold text-slate-900">
                   Notifications
                   {items.length > 0 && (
-                    <span className="ml-1.5 text-xs font-normal text-slate-400">
+                    <span className="ml-1.5 text-xs font-medium text-slate-400">
                       · {items.length}
                     </span>
                   )}
@@ -140,7 +148,10 @@ export function NotificationBell({
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto overscroll-contain">
+            {/* Scrollable list — `flex-1 min-h-0` is the magic combo that
+                lets a flex child scroll without pushing the footer below
+                the viewport. */}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               {items.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 px-5 py-12 text-slate-400">
                   <Inbox className="h-7 w-7" />
@@ -193,12 +204,13 @@ export function NotificationBell({
               )}
             </div>
 
+            {/* Footer */}
             {items.length > 0 && (
-              <div className="border-t border-slate-100 px-5 py-3">
+              <div className="shrink-0 border-t border-slate-100 px-5 py-3">
                 <button
                   type="button"
                   onClick={closePanel}
-                  className="w-full rounded-xl bg-brand-50 py-2 text-xs font-semibold text-brand-700 active:scale-[0.98]"
+                  className="w-full rounded-xl bg-brand-50 py-2.5 text-sm font-semibold text-brand-700 active:scale-[0.98]"
                 >
                   Tout marquer comme lu
                 </button>
