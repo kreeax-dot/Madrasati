@@ -1,4 +1,4 @@
-import { GraduationCap } from "lucide-react";
+import { GraduationCap, BookOpenCheck } from "lucide-react";
 import { TopBar } from "@/components/nav/TopBar";
 import { Realtime } from "@/components/Realtime";
 import { createClient } from "@/lib/supabase/server";
@@ -32,7 +32,12 @@ export default async function ExamsPage() {
     return (
       <div className="space-y-5">
         <Realtime tables={["exams"]} />
-        <TopBar subtitle="Évaluations" title="Examens" />
+        <TopBar
+          subtitle="Évaluations"
+          title="Examens"
+          icon={<BookOpenCheck className="h-5 w-5" />}
+          accent="from-rose-500 to-rose-700"
+        />
         <ExamEditor classes={classes} exams={exams} />
       </div>
     );
@@ -62,7 +67,12 @@ export default async function ExamsPage() {
   return (
     <div className="space-y-5">
       <Realtime tables={["exams"]} />
-      <TopBar subtitle="À venir" title="Examens" />
+      <TopBar
+        subtitle="À venir"
+        title="Examens"
+        icon={<BookOpenCheck className="h-5 w-5" />}
+        accent="from-rose-500 to-rose-700"
+      />
       {visible.length === 0 ? (
         <div className="card flex flex-col items-center gap-2 px-4 py-10 text-slate-400">
           <GraduationCap className="h-6 w-6" />

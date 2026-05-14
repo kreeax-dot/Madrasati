@@ -6,10 +6,11 @@ import Link from "next/link";
 import {
   AlertCircle,
   ArrowLeft,
-  GraduationCap,
   KeyRound,
   Loader2,
   LogIn,
+  School as SchoolIcon,
+  Sparkles,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { redeemCodeAndCreateAccount } from "@/app/actions/signup";
@@ -130,14 +131,38 @@ function LoginInner() {
         <ArrowLeft className="h-5 w-5" />
       </Link>
 
-      <div className="mt-10 flex items-center gap-2">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white">
-          <GraduationCap className="h-5 w-5" />
+      {/* Hero block — matches the dashboard's gradient identity. */}
+      <section className="relative mt-6 overflow-hidden rounded-3xl bg-gradient-to-br from-brand-500 via-brand-600 to-brand-800 p-6 text-white shadow-tile animate-slide-up">
+        <span
+          className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-white/10"
+          aria-hidden
+        />
+        <span
+          className="pointer-events-none absolute -bottom-8 -left-6 h-24 w-24 rounded-full bg-white/10"
+          aria-hidden
+        />
+        <div className="relative flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
+            <SchoolIcon className="h-6 w-6" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-white/70">
+              Madrasati
+            </p>
+            <h1 className="text-2xl font-bold tracking-tight">Bienvenue 👋</h1>
+          </div>
         </div>
-        <span className="text-lg font-semibold tracking-tight">Madrasati</span>
-      </div>
+        <p className="relative mt-3 text-sm leading-relaxed text-white/85">
+          Suivez la scolarité de vos enfants, communiquez avec l&apos;école,
+          gérez paiements, devoirs et bien plus.
+        </p>
+        <div className="relative mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold text-white/90 backdrop-blur-sm">
+          <Sparkles className="h-3 w-3" />
+          Tout en un seul endroit
+        </div>
+      </section>
 
-      <div className="mt-8 grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 text-sm font-medium">
+      <div className="mt-6 grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 text-sm font-medium">
         <button
           type="button"
           onClick={() => {

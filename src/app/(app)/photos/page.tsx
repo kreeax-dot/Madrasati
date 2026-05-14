@@ -1,3 +1,4 @@
+import { Images } from "lucide-react";
 import { TopBar } from "@/components/nav/TopBar";
 import { Realtime } from "@/components/Realtime";
 import { createClient } from "@/lib/supabase/server";
@@ -28,7 +29,12 @@ export default async function PhotosPage() {
   return (
     <div className="space-y-5">
       <Realtime tables={["photos"]} />
-      <TopBar subtitle="Galerie" title="Photos" />
+      <TopBar
+        subtitle="Galerie"
+        title="Photos"
+        icon={<Images className="h-5 w-5" />}
+        accent="from-cyan-500 to-cyan-700"
+      />
 
       {isDirector && (
         <PhotoUploader

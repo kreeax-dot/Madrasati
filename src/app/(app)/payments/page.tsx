@@ -1,4 +1,5 @@
 import { Clock, Wallet } from "lucide-react";
+// Wallet stays for the parent-side hero icon as well.
 import { TopBar } from "@/components/nav/TopBar";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
@@ -57,7 +58,12 @@ export default async function PaymentsPage() {
     return (
       <div className="space-y-5">
         <Realtime tables={["payments"]} />
-        <TopBar subtitle="Suivi" title="Paiements" />
+        <TopBar
+          subtitle="Suivi"
+          title="Paiements"
+          icon={<Wallet className="h-5 w-5" />}
+          accent="from-emerald-500 to-emerald-700"
+        />
         <Totals paid={totals.paid} pending={totals.pending} />
         <PaymentsExplorer
           payments={list}
@@ -81,7 +87,12 @@ export default async function PaymentsPage() {
   return (
     <div className="space-y-5">
       <Realtime tables={["payments"]} />
-      <TopBar subtitle="Mes paiements" title="Paiements" />
+      <TopBar
+        subtitle="Mes paiements"
+        title="Paiements"
+        icon={<Wallet className="h-5 w-5" />}
+        accent="from-emerald-500 to-emerald-700"
+      />
 
       {next ? (
         <div className="card border-0 bg-gradient-to-br from-emerald-500 to-emerald-700 p-5 text-white">

@@ -1,3 +1,4 @@
+import { ClipboardList } from "lucide-react";
 import { TopBar } from "@/components/nav/TopBar";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
@@ -42,7 +43,12 @@ export default async function AbsencesPage() {
   return (
     <div className="space-y-5">
       <Realtime tables={["absences"]} />
-      <TopBar subtitle="Suivi" title="Absences" />
+      <TopBar
+        subtitle="Suivi"
+        title="Absences"
+        icon={<ClipboardList className="h-5 w-5" />}
+        accent="from-red-500 to-red-700"
+      />
 
       {isDirector && <AbsenceCreator students={(students as any[]) ?? []} />}
 

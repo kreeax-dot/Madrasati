@@ -1,3 +1,4 @@
+import { BookOpen } from "lucide-react";
 import { TopBar } from "@/components/nav/TopBar";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
@@ -29,7 +30,12 @@ export default async function HomeworkPage() {
   if (profile.role === "director") {
     return (
       <div className="space-y-5">
-        <TopBar subtitle="Devoirs" title="Devoirs à donner" />
+        <TopBar
+          subtitle="Devoirs"
+          title="Devoirs à donner"
+          icon={<BookOpen className="h-5 w-5" />}
+          accent="from-purple-500 to-purple-700"
+        />
         <HomeworkEditor classes={classes} homework={homework} />
       </div>
     );
@@ -38,7 +44,12 @@ export default async function HomeworkPage() {
   return (
     <div className="space-y-5">
       <Realtime tables={["homework"]} />
-      <TopBar subtitle="Devoirs" title="À faire" />
+      <TopBar
+        subtitle="Devoirs"
+        title="À faire"
+        icon={<BookOpen className="h-5 w-5" />}
+        accent="from-purple-500 to-purple-700"
+      />
       {homework.length === 0 ? (
         <div className="card px-4 py-10 text-center text-sm text-slate-400">
           Aucun devoir pour le moment.

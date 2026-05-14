@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Users, GraduationCap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getSessionProfile } from "@/lib/auth";
 import { getCurrentSchool } from "@/lib/school";
 import { features, type FeatureKey } from "@/lib/features";
@@ -16,9 +17,16 @@ export default async function DashboardPage() {
   const isDirector = profile.role === "director";
   const isStudent = profile.role === "student";
 
+  // For director counters, use the admin client + explicit school_id filter
+  // to immunise against any RLS / current_school_id drift.
+  const reader =
+    isDirector && profile.school_id ? createAdminClient() : supabase;
+
   // Counters (role-aware students count).
   const studentsQ = isDirector
-    ? supabase.from("students").select("id", { count: "exact", head: true })
+    ? (profile.school_id
+        ? reader.from("students").select("id", { count: "exact", head: true }).eq("school_id", profile.school_id)
+        : reader.from("students").select("id", { count: "exact", head: true }))
     : isStudent && profile.student_id
       ? supabase
           .from("students")
@@ -29,6 +37,10 @@ export default async function DashboardPage() {
           .select("id", { count: "exact", head: true })
           .eq("parent_id", profile.id);
 
+  const paymentsQ = isDirector && profile.school_id
+    ? reader.from("payments").select("id", { count: "exact", head: true }).eq("school_id", profile.school_id).neq("status", "paid")
+    : supabase.from("payments").select("id", { count: "exact", head: true }).neq("status", "paid");
+
   const [
     { count: studentsCount },
     { count: pendingPayments },
@@ -37,10 +49,7 @@ export default async function DashboardPage() {
     { data: recentPayments },
   ] = await Promise.all([
     studentsQ,
-    supabase
-      .from("payments")
-      .select("id", { count: "exact", head: true })
-      .neq("status", "paid"),
+    paymentsQ,
     supabase
       .from("messages")
       .select("id", { count: "exact", head: true })

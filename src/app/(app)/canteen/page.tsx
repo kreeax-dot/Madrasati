@@ -36,7 +36,12 @@ export default async function CanteenPage() {
     return (
       <div className="space-y-5">
         <Realtime tables={["canteen_menus"]} />
-        <TopBar subtitle="Cantine" title="Menu de la semaine" />
+        <TopBar
+        subtitle="Cantine"
+        title="Menu de la semaine"
+        icon={<UtensilsCrossed className="h-5 w-5" />}
+        accent="from-amber-500 to-amber-700"
+      />
         <CanteenEditor weekStart={weekStart} initial={(menus as any[]) ?? []} />
       </div>
     );
@@ -49,7 +54,12 @@ export default async function CanteenPage() {
   return (
     <div className="space-y-5">
       <Realtime tables={["canteen_menus"]} />
-      <TopBar subtitle="Cantine" title="Menu de la semaine" />
+      <TopBar
+        subtitle="Cantine"
+        title="Menu de la semaine"
+        icon={<UtensilsCrossed className="h-5 w-5" />}
+        accent="from-amber-500 to-amber-700"
+      />
       {menus?.length === 0 ? (
         <div className="card flex flex-col items-center gap-2 px-4 py-12 text-slate-400">
           <UtensilsCrossed className="h-7 w-7" />

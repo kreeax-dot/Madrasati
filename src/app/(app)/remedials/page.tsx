@@ -1,4 +1,5 @@
 import { Repeat } from "lucide-react";
+// Repeat icon also drives the TopBar accent below.
 import { TopBar } from "@/components/nav/TopBar";
 import { Realtime } from "@/components/Realtime";
 import { createClient } from "@/lib/supabase/server";
@@ -90,7 +91,12 @@ function Shell({
   return (
     <div className="space-y-5">
       <Realtime tables={["remedials"]} />
-      <TopBar subtitle="Sessions de soutien" title="Rattrapages" />
+      <TopBar
+        subtitle="Sessions de soutien"
+        title="Rattrapages"
+        icon={<Repeat className="h-5 w-5" />}
+        accent="from-indigo-500 to-indigo-700"
+      />
 
       {isDirector && <RemedialCreator students={students} />}
 

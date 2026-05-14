@@ -5,10 +5,6 @@ import { Bell, Inbox, X } from "lucide-react";
 import { features } from "@/lib/features";
 import type { NotifItem } from "@/lib/notifications";
 
-/**
- * Per-user lastSeen key so a different user logging in on the same device
- * never inherits "everything read" from the previous account.
- */
 const STORAGE_PREFIX = "madrasati:notif:lastSeen:";
 
 function timeAgo(iso: string) {
@@ -39,7 +35,7 @@ export function NotificationBell({
     try {
       setLastSeen(localStorage.getItem(storageKey) ?? "");
     } catch {
-      /* private-mode etc. */
+      /* ignore */
     }
   }, [storageKey]);
 
@@ -55,12 +51,11 @@ export function NotificationBell({
         setLastSeen(items[0].timestamp);
       }
     } catch {
-      /* still close */
+      /* ignore */
     }
     setOpen(false);
   }, [items, storageKey]);
 
-  // ESC closes; body scroll locked while open.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -94,36 +89,34 @@ export function NotificationBell({
       </button>
 
       {open && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Notifications"
-          /* Flex bottom-sheet layout: the dialog is `fixed inset-0 flex
-             items-end`, so the panel naturally sits at the bottom of the
-             VIEWPORT (not pushed above by stale `absolute bottom:0` quirks
-             that left only the footer visible on some iOS Safari builds). */
-          className="fixed inset-0 z-[60] flex items-end justify-center"
-        >
-          {/* Backdrop */}
+        <>
+          {/* Backdrop — independent fixed element, full viewport, behind panel */}
           <button
             type="button"
             onClick={closePanel}
             aria-label="Fermer les notifications"
-            className="absolute inset-0 h-full w-full cursor-default bg-slate-900/40 backdrop-blur-sm"
+            className="fixed inset-0 z-[60] cursor-default bg-slate-900/40 backdrop-blur-sm animate-fade-in"
           />
 
-          {/* Panel */}
+          {/* Panel — independent fixed element pinned to bottom of viewport.
+              No nested flex, no `absolute` inside `fixed`, no `safe-bottom`
+              padding (which could leave a strip below the footer that made
+              the panel look pushed up on some devices). Explicit
+              `bottom: 0` + `max-height: min(85dvh, calc(100vh - 4rem))`
+              fallback ensures the panel always fits on screen. */}
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Notifications"
             onClick={(e) => e.stopPropagation()}
-            className="relative flex max-h-[85dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-white shadow-card"
+            className="fixed bottom-0 left-1/2 z-[61] flex w-full max-w-md -translate-x-1/2 flex-col overflow-hidden rounded-t-3xl bg-white shadow-card animate-slide-up"
             style={{
-              paddingBottom: "env(safe-area-inset-bottom)",
+              // dvh is the dynamic viewport — collapses with mobile URL bars.
+              maxHeight: "min(85dvh, calc(100vh - 4rem))",
             }}
           >
-            {/* Drag handle */}
             <div className="mx-auto mt-2 h-1.5 w-10 shrink-0 rounded-full bg-slate-200" />
 
-            {/* Header */}
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-3">
               <div className="min-w-0">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
@@ -148,9 +141,8 @@ export function NotificationBell({
               </button>
             </div>
 
-            {/* Scrollable list — `flex-1 min-h-0` is the magic combo that
-                lets a flex child scroll without pushing the footer below
-                the viewport. */}
+            {/* `min-h-0 flex-1 overflow-y-auto` is the canonical scroll combo
+                inside a flex column. */}
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               {items.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 px-5 py-12 text-slate-400">
@@ -169,7 +161,7 @@ export function NotificationBell({
                         className="flex items-start gap-3 px-5 py-3.5"
                       >
                         <div
-                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${f.bgSoft} ${f.text}`}
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${f.gradient} text-white shadow-soft`}
                         >
                           <Icon className="h-4 w-4" />
                         </div>
@@ -195,7 +187,7 @@ export function NotificationBell({
                           )}
                         </div>
                         {isNew && (
-                          <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-500" />
+                          <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-brand-500" />
                         )}
                       </li>
                     );
@@ -204,20 +196,24 @@ export function NotificationBell({
               )}
             </div>
 
-            {/* Footer */}
             {items.length > 0 && (
-              <div className="shrink-0 border-t border-slate-100 px-5 py-3">
+              <div
+                className="shrink-0 border-t border-slate-100 bg-white px-5 py-3"
+                style={{
+                  paddingBottom: `calc(env(safe-area-inset-bottom) + 0.75rem)`,
+                }}
+              >
                 <button
                   type="button"
                   onClick={closePanel}
-                  className="w-full rounded-xl bg-brand-50 py-2.5 text-sm font-semibold text-brand-700 active:scale-[0.98]"
+                  className="w-full rounded-2xl bg-brand-600 py-3 text-sm font-semibold text-white shadow-tile active:scale-[0.98]"
                 >
                   Tout marquer comme lu
                 </button>
               </div>
             )}
           </div>
-        </div>
+        </>
       )}
     </>
   );

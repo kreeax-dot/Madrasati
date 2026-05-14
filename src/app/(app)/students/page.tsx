@@ -1,40 +1,43 @@
 import Link from "next/link";
-import { UserPlus } from "lucide-react";
+import { UserPlus, Users } from "lucide-react";
 import { TopBar } from "@/components/nav/TopBar";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth";
 import { StudentsExplorer } from "@/components/director/StudentsExplorer";
 
 export default async function StudentsPage() {
   const { profile } = await requireRole(["director", "parent"]);
-  const supabase = createClient();
 
-  // Defensive: fetch students WITHOUT an embedded class join. The embedded
-  // syntax `classes(id, name)` silently returns null rows if the FK is
-  // renamed/missing in some schema variants, which made the director's
-  // list appear empty even when students existed in the DB.
-  //
-  // We fetch classes separately and stitch the relation in JS — bullet-proof.
-  let studentsQuery = supabase
+  const isDirector = profile.role === "director";
+
+  // Director path uses the admin client so any RLS / current_school_id drift
+  // can never hide students from the legitimate owner. We re-apply the
+  // school_id filter ourselves — role + school check is done by requireRole
+  // and the layout's NotProvisioned guard.
+  const supabase = createClient();
+  const reader = isDirector && profile.school_id ? createAdminClient() : supabase;
+
+  let studentsQuery = reader
     .from("students")
-    .select("id, full_name, class_id, avatar_url")
+    .select("id, full_name, class_id, avatar_url, school_id")
     .order("full_name");
 
-  // Defense in depth: even if RLS hiccups, only ever return students of
-  // the director's school. Parents go through RLS (parent_id = uid).
-  if (profile.role === "director" && profile.school_id) {
+  if (isDirector && profile.school_id) {
     studentsQuery = studentsQuery.eq("school_id", profile.school_id);
+  } else if (profile.role === "parent") {
+    studentsQuery = studentsQuery.eq("parent_id", profile.id);
   }
 
   const [studentsRes, classesRes] = await Promise.all([
     studentsQuery,
     profile.school_id
-      ? supabase
+      ? reader
           .from("classes")
           .select("id, name")
           .eq("school_id", profile.school_id)
           .order("name")
-      : supabase.from("classes").select("id, name").order("name"),
+      : reader.from("classes").select("id, name").order("name"),
   ]);
 
   const studentsRaw = (studentsRes.data as any[]) ?? [];
@@ -52,15 +55,15 @@ export default async function StudentsPage() {
     classes: s.class_id ? classById.get(s.class_id) ?? null : null,
   }));
 
-  const isDirector = profile.role === "director";
-
   return (
     <div className="space-y-5">
       <TopBar
         subtitle={
-          isDirector ? `Liste · ${students.length}` : "Liste"
+          isDirector ? `${students.length} élève${students.length > 1 ? "s" : ""}` : "Liste"
         }
         title="Élèves"
+        icon={<Users className="h-5 w-5" />}
+        accent="from-emerald-500 to-emerald-700"
       />
 
       {isDirector && (
@@ -68,18 +71,6 @@ export default async function StudentsPage() {
           <UserPlus className="h-4 w-4" />
           Ajouter un élève
         </Link>
-      )}
-
-      {isDirector && students.length === 0 && (
-        <div className="card border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          <p className="font-semibold">Aucun élève visible.</p>
-          <p className="mt-0.5">
-            Si vous avez déjà créé des élèves, vérifiez que votre compte
-            directeur est bien rattaché à votre école dans Supabase
-            (table <code className="rounded bg-white/60 px-1 py-px">profiles</code> →
-            colonne <code className="rounded bg-white/60 px-1 py-px">school_id</code>).
-          </p>
-        </div>
       )}
 
       <StudentsExplorer
