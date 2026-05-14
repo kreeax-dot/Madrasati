@@ -2,9 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Check, Copy, Loader2, UserPlus } from "lucide-react";
+import { AlertTriangle, Check, Copy, Loader2, UserPlus } from "lucide-react";
 import { createStudent } from "@/app/actions/director";
 import { AvatarPicker } from "./AvatarPicker";
+
+type DebugError = {
+  message: string;
+  step: string;
+  details?: Record<string, unknown>;
+};
 
 export function NewStudentForm({
   classes,
@@ -13,7 +19,7 @@ export function NewStudentForm({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<DebugError | null>(null);
   const [result, setResult] = useState<{ code: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -24,10 +30,24 @@ export function NewStudentForm({
     startTransition(async () => {
       try {
         const res = await createStudent(fd);
-        setResult({ code: res.code });
-        (e.target as HTMLFormElement).reset();
+        if (res.ok) {
+          setResult({ code: res.code });
+          (e.target as HTMLFormElement).reset();
+        } else {
+          // Server action returned structured error — surface fully.
+          setError({
+            message: res.error,
+            step: res.step,
+            details: res.details,
+          });
+        }
       } catch (err: any) {
-        setError(err?.message ?? "Erreur");
+        // Caught client-side throw (network etc.) — also surface fully.
+        setError({
+          message: err?.message ?? "Erreur inconnue",
+          step: "client_catch",
+          details: { stack: err?.stack },
+        });
       }
     });
   }
@@ -44,7 +64,7 @@ export function NewStudentForm({
       <div className="space-y-5">
         <div className="card p-5 text-center">
           <p className="text-xs font-medium uppercase tracking-wide text-emerald-600">
-            Élève créé ✓
+            Élève créé
           </p>
           <p className="mt-2 text-sm text-slate-600">
             Donnez ce code à l&apos;élève pour qu&apos;il crée son compte :
@@ -58,7 +78,7 @@ export function NewStudentForm({
             className="mt-4 inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700"
           >
             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            {copied ? "Copié !" : "Copier le code"}
+            {copied ? "Copié" : "Copier le code"}
           </button>
           <p className="mt-3 text-xs text-slate-400">
             Code à usage unique. À utiliser sur la page de connexion → onglet « Code élève ».
@@ -114,13 +134,35 @@ export function NewStudentForm({
           ))}
         </select>
       </div>
-      {error && (
-        <div className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
-      )}
+
+      {error && <ErrorPanel error={error} />}
+
       <button type="submit" disabled={pending} className="btn-primary w-full disabled:opacity-60">
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
         Créer l&apos;élève + générer le code
       </button>
     </form>
+  );
+}
+
+function ErrorPanel({ error }: { error: DebugError }) {
+  return (
+    <div className="space-y-2 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">Erreur</p>
+          <p className="mt-0.5 break-words font-mono text-xs">{error.message}</p>
+        </div>
+      </div>
+      <details className="text-xs">
+        <summary className="cursor-pointer font-medium text-red-700">
+          Détails techniques (étape : {error.step})
+        </summary>
+        <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-white/60 p-2 font-mono text-[10px] leading-tight text-red-900">
+          {JSON.stringify(error.details ?? {}, null, 2)}
+        </pre>
+      </details>
+    </div>
   );
 }

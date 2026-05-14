@@ -2,6 +2,10 @@
 // renders this string + the short git SHA from Vercel so a screenshot is
 // enough to know which build is live.
 //
+//   v13 — DEBUG MODE: createStudent never throws, returns {ok,error,step,
+//         details}; NewStudentForm surfaces the real Supabase error to the
+//         director instead of the opaque "Server Components render" digest;
+//         visible AR/FR toggle pinned in the header
 //   v12 — admin client safety-net fallback, markAllNotificationsRead clears
 //         DB, FR/AR i18n with RTL switch, file inputs accept gallery
 //   v11 — student creation hard fix (admin client for ALL writes), notif
@@ -22,7 +26,7 @@
 //
 // Vercel sets VERCEL_GIT_COMMIT_SHA at build time for every deployment. We
 // expose it as NEXT_PUBLIC_* via next.config (or fall back if running locally).
-export const APP_VERSION = "v12";
+export const APP_VERSION = "v13";
 
 export const APP_BUILD_SHA =
   process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local";

@@ -5,6 +5,7 @@ import { getSessionProfile } from "@/lib/auth";
 import { getCurrentSchool } from "@/lib/school";
 import { fetchNotifications } from "@/lib/notifications";
 import { APP_BUILD_LABEL } from "@/lib/version";
+import { LanguageToggle } from "./LanguageToggle";
 import { LogoutButton } from "./LogoutButton";
 import { NotificationBell } from "./NotificationBell";
 import { UserMenu } from "./UserMenu";
@@ -77,7 +78,8 @@ export async function AppHeader() {
           </Link>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <LanguageToggle />
           <NotificationBell items={notifications} userId={userId} />
           <UserMenu fullName={profile.full_name} email={email} role={profile.role} />
           <LogoutButton />

@@ -87,72 +87,180 @@ async function getSchoolId() {
 }
 
 // ─── STUDENTS ─────────────────────────────────────────────────────────────────
-export async function createStudent(formData: FormData): Promise<{
-  studentId: string;
-  code: string;
-}> {
-  const schoolId = await getSchoolId();
-  const admin = adminWriter();
+/**
+ * createStudent — DEBUG version (returns the real error to the client).
+ *
+ * No admin-client abstraction, no service-role-key dependency. Plain
+ * user-scoped supabase client, RLS as the only authorization layer.
+ *
+ * Returns:
+ *   { ok: true, studentId, code }           on success
+ *   { ok: false, error, step, details }     on failure (NEVER throws)
+ *
+ * The "never throw" contract matters: when a server action throws and a
+ * downstream revalidatePath fires, Next.js often surfaces the throw as
+ * the opaque "An error occurred in the Server Components render". By
+ * returning an object instead, the client component can render the
+ * actual error message.
+ */
+export type CreateStudentResult =
+  | { ok: true; studentId: string; code: string }
+  | {
+      ok: false;
+      error: string;
+      step: string;
+      details?: Record<string, unknown>;
+    };
 
-  const firstName = String(formData.get("first_name") ?? "").trim();
-  const lastName = String(formData.get("last_name") ?? "").trim();
-  const fullName = `${firstName} ${lastName}`.trim();
-  const dob = String(formData.get("date_of_birth") ?? "") || null;
-  const classId = String(formData.get("class_id") ?? "") || null;
-  if (!fullName) throw new Error("Nom requis");
-
-  // Avatar upload via admin client too — same reason: avoids any RLS
-  // surprises on the storage objects.
-  const avatarFile = formData.get("avatar") as File | null;
-  let avatarUrl: string | null = null;
-  if (
-    avatarFile &&
-    typeof avatarFile === "object" &&
-    "size" in avatarFile &&
-    avatarFile.size > 0
-  ) {
-    try {
-      avatarUrl = await uploadToBucket(admin, "avatars", schoolId, avatarFile);
-    } catch (err: any) {
-      // Don't block student creation if the photo fails.
-      console.warn("[createStudent] avatar upload failed:", err?.message ?? err);
-      avatarUrl = null;
+export async function createStudent(
+  formData: FormData,
+): Promise<CreateStudentResult> {
+  let step = "init";
+  try {
+    step = "auth";
+    const { profile } = await requireRole(["director"]);
+    if (!profile.school_id) {
+      return {
+        ok: false,
+        error: "Votre compte n'est associé à aucune école.",
+        step,
+        details: { profileId: profile.id, role: profile.role },
+      };
     }
-  }
+    const schoolId = profile.school_id;
 
-  const { data: student, error } = await admin
-    .from("students")
-    .insert({
+    step = "parse";
+    const firstName = String(formData.get("first_name") ?? "").trim();
+    const lastName = String(formData.get("last_name") ?? "").trim();
+    const fullName = `${firstName} ${lastName}`.trim();
+    const dob = String(formData.get("date_of_birth") ?? "") || null;
+    const classId = String(formData.get("class_id") ?? "") || null;
+    if (!fullName) {
+      return { ok: false, error: "Nom requis", step };
+    }
+
+    step = "client";
+    const supabase = createClient();
+
+    // Avatar is best-effort; never let it block student creation.
+    step = "avatar";
+    let avatarUrl: string | null = null;
+    const avatarFile = formData.get("avatar") as File | null;
+    if (
+      avatarFile &&
+      typeof avatarFile === "object" &&
+      "size" in avatarFile &&
+      avatarFile.size > 0
+    ) {
+      try {
+        avatarUrl = await uploadToBucket(supabase, "avatars", schoolId, avatarFile);
+      } catch (err: any) {
+        console.warn(
+          "[createStudent] avatar upload failed (non-fatal):",
+          err?.message ?? err,
+        );
+        avatarUrl = null;
+      }
+    }
+
+    step = "insert_student";
+    const insertPayload = {
       school_id: schoolId,
       full_name: fullName,
       class_id: classId,
       date_of_birth: dob,
       avatar_url: avatarUrl,
-    })
-    .select("id")
-    .single();
-  if (error || !student) {
-    throw new Error(error?.message ?? "Erreur lors de la création de l'élève");
-  }
+    };
+    console.log("[createStudent] inserting:", insertPayload);
 
-  // Generate a unique code (retry on collision).
-  let code = "";
-  for (let attempt = 0; attempt < 5; attempt++) {
-    code = generateCode(7);
-    const { error: codeErr } = await admin.from("student_codes").insert({
-      code,
-      student_id: student.id,
-      school_id: schoolId,
-    });
-    if (!codeErr) break;
-    if (attempt === 4) {
-      throw new Error("Impossible de générer un code unique");
+    const { data: student, error: insertError } = await supabase
+      .from("students")
+      .insert(insertPayload)
+      .select("id, school_id, full_name")
+      .single();
+
+    if (insertError) {
+      console.error("[createStudent] INSERT FAILED", {
+        message: insertError.message,
+        code: (insertError as any).code,
+        details: (insertError as any).details,
+        hint: (insertError as any).hint,
+        payload: insertPayload,
+      });
+      return {
+        ok: false,
+        error: insertError.message,
+        step,
+        details: {
+          code: (insertError as any).code,
+          hint: (insertError as any).hint,
+          pgDetails: (insertError as any).details,
+          payload: insertPayload,
+        },
+      };
     }
-  }
+    if (!student) {
+      return {
+        ok: false,
+        error: "Insert renvoyé sans données (RLS silencieuse ?)",
+        step,
+        details: { payload: insertPayload },
+      };
+    }
 
-  revalidatePath("/students");
-  revalidatePath("/dashboard");
-  return { studentId: student.id, code };
+    step = "insert_code";
+    let code = "";
+    let codeErrSeen: any = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      code = generateCode(7);
+      const { error: codeErr } = await supabase.from("student_codes").insert({
+        code,
+        student_id: student.id,
+        school_id: schoolId,
+      });
+      if (!codeErr) {
+        codeErrSeen = null;
+        break;
+      }
+      codeErrSeen = codeErr;
+      if (attempt === 4) {
+        console.error("[createStudent] student_codes insert failed", codeErr);
+        return {
+          ok: false,
+          error: `Code: ${codeErr.message}`,
+          step,
+          details: {
+            code: (codeErr as any).code,
+            hint: (codeErr as any).hint,
+          },
+        };
+      }
+    }
+
+    step = "revalidate";
+    try {
+      revalidatePath("/students");
+      revalidatePath("/dashboard");
+    } catch (err) {
+      // revalidatePath should not throw — defensive log only.
+      console.warn("[createStudent] revalidate failed:", err);
+    }
+
+    return { ok: true, studentId: student.id, code };
+  } catch (err: any) {
+    console.error("[createStudent] UNCAUGHT", {
+      step,
+      message: err?.message,
+      stack: err?.stack,
+      raw: err,
+    });
+    return {
+      ok: false,
+      error: err?.message ?? "Erreur inconnue",
+      step,
+      details: { stack: err?.stack },
+    };
+  }
 }
 
 export async function regenerateStudentCode(studentId: string): Promise<string> {
