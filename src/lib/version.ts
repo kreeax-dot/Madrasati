@@ -2,6 +2,9 @@
 // renders this string + the short git SHA from Vercel so a screenshot is
 // enough to know which build is live.
 //
+//   v11 — student creation hard fix (admin client for ALL writes), notif
+//         bell via React portal (escape parent containing-blocks), header
+//         identity strip only on /dashboard, all emojis removed
 //   v10 — design system applied to ALL pages (TopBar accent+icon), students
 //         list uses admin client (no more empty for directors), notif panel
 //         re-positioned with direct fixed + dvh fallback, login hero block
@@ -17,7 +20,7 @@
 //
 // Vercel sets VERCEL_GIT_COMMIT_SHA at build time for every deployment. We
 // expose it as NEXT_PUBLIC_* via next.config (or fall back if running locally).
-export const APP_VERSION = "v10";
+export const APP_VERSION = "v11";
 
 export const APP_BUILD_SHA =
   process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local";

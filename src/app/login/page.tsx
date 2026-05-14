@@ -149,7 +149,7 @@ function LoginInner() {
             <p className="text-[10px] font-semibold uppercase tracking-wider text-white/70">
               Madrasati
             </p>
-            <h1 className="text-2xl font-bold tracking-tight">Bienvenue 👋</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Bienvenue</h1>
           </div>
         </div>
         <p className="relative mt-3 text-sm leading-relaxed text-white/85">

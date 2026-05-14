@@ -201,7 +201,7 @@ export default async function DashboardPage() {
               Bonjour
             </p>
             <h1 className="mt-0.5 text-2xl font-bold leading-tight tracking-tight truncate">
-              {(studentAvatar?.name ?? profile.full_name).split(" ")[0]} 👋
+              {(studentAvatar?.name ?? profile.full_name).split(" ")[0]}
             </h1>
           </div>
         </div>

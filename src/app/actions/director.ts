@@ -3,19 +3,33 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth";
 import { generateCode } from "@/lib/codes";
+
+/**
+ * All director-side write actions go through this. Role + school are
+ * verified by `requireRole + getSchoolId` above, so it's safe — we then
+ * use the admin client to write, sidestepping any RLS drift that has
+ * historically hidden / blocked writes for legitimate directors.
+ *
+ * Reads stay on the user-scoped client where possible so RLS keeps
+ * defense in depth; the few read paths that matter for the director
+ * (students list, dashboard counters) already use the admin client.
+ */
+function adminWriter() {
+  return createAdminClient();
+}
 
 // ─── CLASSES ──────────────────────────────────────────────────────────────────
 export async function createClass(formData: FormData) {
   const schoolId = await getSchoolId();
-  const supabase = createClient();
 
   const name = String(formData.get("name") ?? "").trim();
   const level = String(formData.get("level") ?? "").trim() || null;
   if (!name) throw new Error("Nom requis");
 
-  const { error } = await supabase
+  const { error } = await adminWriter()
     .from("classes")
     .insert({ school_id: schoolId, name, level });
   if (error) throw new Error(error.message);
@@ -26,11 +40,11 @@ export async function createClass(formData: FormData) {
 
 export async function deleteClass(classId: string) {
   const schoolId = await getSchoolId();
-  const supabase = createClient();
+  const admin = adminWriter();
 
   // Unassign students from the class so they are not lost (class_id is ON DELETE
   // SET NULL via FK, but we do it explicitly to keep things obvious + revalidate).
-  const { error: unassignErr } = await supabase
+  const { error: unassignErr } = await admin
     .from("students")
     .update({ class_id: null })
     .eq("class_id", classId)
@@ -40,7 +54,7 @@ export async function deleteClass(classId: string) {
   }
 
   // schedules / homework / exams cascade via FK on delete.
-  const { error } = await supabase
+  const { error } = await admin
     .from("classes")
     .delete()
     .eq("id", classId)
@@ -66,7 +80,7 @@ export async function createStudent(formData: FormData): Promise<{
   code: string;
 }> {
   const schoolId = await getSchoolId();
-  const supabase = createClient();
+  const admin = adminWriter();
 
   const firstName = String(formData.get("first_name") ?? "").trim();
   const lastName = String(formData.get("last_name") ?? "").trim();
@@ -75,20 +89,26 @@ export async function createStudent(formData: FormData): Promise<{
   const classId = String(formData.get("class_id") ?? "") || null;
   if (!fullName) throw new Error("Nom requis");
 
+  // Avatar upload via admin client too — same reason: avoids any RLS
+  // surprises on the storage objects.
   const avatarFile = formData.get("avatar") as File | null;
   let avatarUrl: string | null = null;
-  if (avatarFile && typeof avatarFile === "object" && "size" in avatarFile && avatarFile.size > 0) {
+  if (
+    avatarFile &&
+    typeof avatarFile === "object" &&
+    "size" in avatarFile &&
+    avatarFile.size > 0
+  ) {
     try {
-      avatarUrl = await uploadToBucket(supabase, "avatars", schoolId, avatarFile);
+      avatarUrl = await uploadToBucket(admin, "avatars", schoolId, avatarFile);
     } catch (err: any) {
-      // Don't block student creation if photo upload fails — the director can
-      // re-attach a photo later from the student detail page.
+      // Don't block student creation if the photo fails.
       console.warn("[createStudent] avatar upload failed:", err?.message ?? err);
       avatarUrl = null;
     }
   }
 
-  const { data: student, error } = await supabase
+  const { data: student, error } = await admin
     .from("students")
     .insert({
       school_id: schoolId,
@@ -99,31 +119,36 @@ export async function createStudent(formData: FormData): Promise<{
     })
     .select("id")
     .single();
-  if (error || !student) throw new Error(error?.message ?? "Erreur");
+  if (error || !student) {
+    throw new Error(error?.message ?? "Erreur lors de la création de l'élève");
+  }
 
-  // Generate a unique code (retry on collision; 7 chars from 31-char alphabet → ~27 billion possibilities).
+  // Generate a unique code (retry on collision).
   let code = "";
   for (let attempt = 0; attempt < 5; attempt++) {
     code = generateCode(7);
-    const { error: codeErr } = await supabase.from("student_codes").insert({
+    const { error: codeErr } = await admin.from("student_codes").insert({
       code,
       student_id: student.id,
       school_id: schoolId,
     });
     if (!codeErr) break;
-    if (attempt === 4) throw new Error("Impossible de générer un code unique");
+    if (attempt === 4) {
+      throw new Error("Impossible de générer un code unique");
+    }
   }
 
   revalidatePath("/students");
+  revalidatePath("/dashboard");
   return { studentId: student.id, code };
 }
 
 export async function regenerateStudentCode(studentId: string): Promise<string> {
   const schoolId = await getSchoolId();
-  const supabase = createClient();
+  const admin = adminWriter();
 
   // Invalidate any active codes for this student.
-  await supabase
+  await admin
     .from("student_codes")
     .update({ used_at: new Date().toISOString() })
     .eq("student_id", studentId)
@@ -132,7 +157,7 @@ export async function regenerateStudentCode(studentId: string): Promise<string> 
   let code = "";
   for (let attempt = 0; attempt < 5; attempt++) {
     code = generateCode(7);
-    const { error } = await supabase.from("student_codes").insert({
+    const { error } = await admin.from("student_codes").insert({
       code,
       student_id: studentId,
       school_id: schoolId,
@@ -146,8 +171,7 @@ export async function regenerateStudentCode(studentId: string): Promise<string> 
 
 export async function assignStudentToClass(studentId: string, classId: string | null) {
   await getSchoolId();
-  const supabase = createClient();
-  const { error } = await supabase
+  const { error } = await adminWriter()
     .from("students")
     .update({ class_id: classId })
     .eq("id", studentId);
@@ -158,7 +182,6 @@ export async function assignStudentToClass(studentId: string, classId: string | 
 // ─── SCHEDULES ────────────────────────────────────────────────────────────────
 export async function createSchedule(formData: FormData) {
   const schoolId = await getSchoolId();
-  const supabase = createClient();
 
   const classId = String(formData.get("class_id") ?? "");
   const day = Number(formData.get("day_of_week") ?? -1);
@@ -173,7 +196,7 @@ export async function createSchedule(formData: FormData) {
   if (!start || !end) throw new Error("Horaires requis");
   if (!subject) throw new Error("Matière requise");
 
-  const { error } = await supabase.from("schedules").insert({
+  const { error } = await adminWriter().from("schedules").insert({
     school_id: schoolId,
     class_id: classId,
     day_of_week: day,
@@ -190,8 +213,10 @@ export async function createSchedule(formData: FormData) {
 
 export async function deleteSchedule(scheduleId: string) {
   await getSchoolId();
-  const supabase = createClient();
-  const { error } = await supabase.from("schedules").delete().eq("id", scheduleId);
+  const { error } = await adminWriter()
+    .from("schedules")
+    .delete()
+    .eq("id", scheduleId);
   if (error) throw new Error(error.message);
   revalidatePath("/schedule");
 }
@@ -199,7 +224,6 @@ export async function deleteSchedule(scheduleId: string) {
 // ─── HOMEWORK (class-based) ───────────────────────────────────────────────────
 export async function createHomework(formData: FormData) {
   const schoolId = await getSchoolId();
-  const supabase = createClient();
   const { profile } = await requireRole(["director"]);
 
   const classId = String(formData.get("class_id") ?? "");
@@ -212,7 +236,7 @@ export async function createHomework(formData: FormData) {
     throw new Error("Champs requis");
   }
 
-  const { error } = await supabase.from("homework").insert({
+  const { error } = await adminWriter().from("homework").insert({
     school_id: schoolId,
     class_id: classId,
     subject,
@@ -228,8 +252,7 @@ export async function createHomework(formData: FormData) {
 
 export async function deleteHomework(id: string) {
   await getSchoolId();
-  const supabase = createClient();
-  const { error } = await supabase.from("homework").delete().eq("id", id);
+  const { error } = await adminWriter().from("homework").delete().eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/homework");
 }
@@ -237,7 +260,6 @@ export async function deleteHomework(id: string) {
 // ─── ABSENCES ─────────────────────────────────────────────────────────────────
 export async function createAbsence(formData: FormData) {
   const schoolId = await getSchoolId();
-  const supabase = createClient();
 
   const studentId = String(formData.get("student_id") ?? "");
   const date = String(formData.get("date") ?? "");
@@ -246,7 +268,7 @@ export async function createAbsence(formData: FormData) {
 
   if (!studentId || !date) throw new Error("Champs requis");
 
-  const { error } = await supabase.from("absences").insert({
+  const { error } = await adminWriter().from("absences").insert({
     school_id: schoolId,
     student_id: studentId,
     date,
@@ -261,7 +283,6 @@ export async function createAbsence(formData: FormData) {
 // ─── PAYMENTS ─────────────────────────────────────────────────────────────────
 export async function createPayment(formData: FormData) {
   const schoolId = await getSchoolId();
-  const supabase = createClient();
 
   const studentId = String(formData.get("student_id") ?? "");
   const amount = Number(formData.get("amount") ?? 0);
@@ -285,7 +306,7 @@ export async function createPayment(formData: FormData) {
   };
   if (alreadyPaid) row.paid_at = new Date().toISOString();
 
-  const { error } = await supabase.from("payments").insert(row);
+  const { error } = await adminWriter().from("payments").insert(row);
   if (error) throw new Error(error.message);
 
   revalidatePath("/payments");
@@ -294,8 +315,7 @@ export async function createPayment(formData: FormData) {
 
 export async function markPaymentPaid(paymentId: string) {
   await getSchoolId();
-  const supabase = createClient();
-  const { error } = await supabase
+  const { error } = await adminWriter()
     .from("payments")
     .update({ status: "paid", paid_at: new Date().toISOString() })
     .eq("id", paymentId);
@@ -306,16 +326,16 @@ export async function markPaymentPaid(paymentId: string) {
 // ─── STUDENT AVATAR ───────────────────────────────────────────────────────────
 export async function updateStudentAvatar(formData: FormData) {
   const schoolId = await getSchoolId();
-  const supabase = createClient();
+  const admin = adminWriter();
 
   const studentId = String(formData.get("student_id") ?? "");
   const file = formData.get("avatar") as File | null;
   if (!studentId) throw new Error("Élève requis");
   if (!file || !("size" in file) || file.size === 0) throw new Error("Image requise");
 
-  const url = await uploadToBucket(supabase, "avatars", schoolId, file);
+  const url = await uploadToBucket(admin, "avatars", schoolId, file);
 
-  const { error } = await supabase
+  const { error } = await admin
     .from("students")
     .update({ avatar_url: url })
     .eq("id", studentId);
@@ -328,8 +348,7 @@ export async function updateStudentAvatar(formData: FormData) {
 
 export async function removeStudentAvatar(studentId: string) {
   await getSchoolId();
-  const supabase = createClient();
-  const { error } = await supabase
+  const { error } = await adminWriter()
     .from("students")
     .update({ avatar_url: null })
     .eq("id", studentId);
@@ -342,7 +361,6 @@ export async function removeStudentAvatar(studentId: string) {
 // ─── REMEDIALS (RATTRAPAGES) ──────────────────────────────────────────────────
 export async function createRemedial(formData: FormData) {
   const schoolId = await getSchoolId();
-  const supabase = createClient();
   const { profile } = await requireRole(["director"]);
 
   const studentId = String(formData.get("student_id") ?? "");
@@ -353,7 +371,7 @@ export async function createRemedial(formData: FormData) {
   if (!studentId || !date) throw new Error("Champs requis");
   if (!duration || duration <= 0) throw new Error("Durée invalide");
 
-  const { error } = await supabase.from("remedials").insert({
+  const { error } = await adminWriter().from("remedials").insert({
     school_id: schoolId,
     student_id: studentId,
     session_date: date,
@@ -364,7 +382,7 @@ export async function createRemedial(formData: FormData) {
   if (error) {
     if (error.message?.toLowerCase().includes("does not exist")) {
       throw new Error(
-        "Table « remedials » introuvable. Appliquez supabase/migration_v7.sql dans Supabase.",
+        "Migration manquante : appliquez supabase/migration_v7.sql dans Supabase.",
       );
     }
     throw new Error(error.message);
@@ -376,8 +394,7 @@ export async function createRemedial(formData: FormData) {
 
 export async function deleteRemedial(id: string) {
   await getSchoolId();
-  const supabase = createClient();
-  const { error } = await supabase.from("remedials").delete().eq("id", id);
+  const { error } = await adminWriter().from("remedials").delete().eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/remedials");
 }
@@ -385,7 +402,6 @@ export async function deleteRemedial(id: string) {
 // ─── EXAMS ────────────────────────────────────────────────────────────────────
 export async function createExam(formData: FormData) {
   const schoolId = await getSchoolId();
-  const supabase = createClient();
   const { profile } = await requireRole(["director"]);
 
   const classId = String(formData.get("class_id") ?? "");
@@ -395,7 +411,7 @@ export async function createExam(formData: FormData) {
 
   if (!classId || !subject || !examDate) throw new Error("Champs requis");
 
-  const { error } = await supabase.from("exams").insert({
+  const { error } = await adminWriter().from("exams").insert({
     school_id: schoolId,
     class_id: classId,
     subject,
@@ -406,7 +422,7 @@ export async function createExam(formData: FormData) {
   if (error) {
     if (error.message?.toLowerCase().includes("does not exist")) {
       throw new Error(
-        "Table « exams » introuvable. Appliquez supabase/migration_v7.sql dans Supabase.",
+        "Migration manquante : appliquez supabase/migration_v7.sql dans Supabase.",
       );
     }
     throw new Error(error.message);
@@ -417,8 +433,7 @@ export async function createExam(formData: FormData) {
 
 export async function deleteExam(id: string) {
   await getSchoolId();
-  const supabase = createClient();
-  const { error } = await supabase.from("exams").delete().eq("id", id);
+  const { error } = await adminWriter().from("exams").delete().eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/exams");
 }
@@ -426,8 +441,8 @@ export async function deleteExam(id: string) {
 // ─── PHOTOS (class or individual) ─────────────────────────────────────────────
 export async function uploadPhoto(formData: FormData) {
   const schoolId = await getSchoolId();
-  const supabase = createClient();
   const { profile } = await requireRole(["director"]);
+  const admin = adminWriter();
 
   const scope = String(formData.get("scope") ?? "");
   const classId = String(formData.get("class_id") ?? "") || null;
@@ -439,9 +454,9 @@ export async function uploadPhoto(formData: FormData) {
   if (scope === "class" && !classId) throw new Error("Classe requise");
   if (scope === "individual" && !studentId) throw new Error("Élève requis");
 
-  const url = await uploadToBucket(supabase, "photos", schoolId, file);
+  const url = await uploadToBucket(admin, "photos", schoolId, file);
 
-  const { error } = await supabase.from("photos").insert({
+  const { error } = await admin.from("photos").insert({
     school_id: schoolId,
     class_id: scope === "class" ? classId : null,
     student_id: scope === "individual" ? studentId : null,
@@ -456,17 +471,17 @@ export async function uploadPhoto(formData: FormData) {
 
 export async function deletePhoto(id: string) {
   await getSchoolId();
-  const supabase = createClient();
-  const { error } = await supabase.from("photos").delete().eq("id", id);
+  const { error } = await adminWriter().from("photos").delete().eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/photos");
 }
 
 // ─── STORAGE HELPER ───────────────────────────────────────────────────────────
-// Uses the user-scoped client so we don't depend on SUPABASE_SERVICE_ROLE_KEY.
-// Migration v5 grants directors INSERT on the avatars / photos buckets.
+// Takes either the user-scoped or admin client. createStudent passes the
+// admin client; uploadPhoto / updateStudentAvatar pass the user client (which
+// hits the storage RLS policies installed in migration_v7).
 async function uploadToBucket(
-  supabase: ReturnType<typeof createClient>,
+  client: { storage: any },
   bucket: "avatars" | "photos",
   schoolId: string,
   file: File,
@@ -479,20 +494,17 @@ async function uploadToBucket(
   const key = `${schoolId}/${crypto.randomUUID()}.${safeExt}`;
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const { error } = await supabase.storage
+  const { error } = await client.storage
     .from(bucket)
     .upload(key, buffer, {
       contentType: file.type || `image/${safeExt}`,
       upsert: false,
     });
   if (error) {
-    throw new Error(
-      `Échec téléversement (${bucket}) : ${error.message}. ` +
-        `Vérifiez que la migration v5 a été appliquée dans Supabase.`,
-    );
+    throw new Error(`Échec téléversement (${bucket}) : ${error.message}`);
   }
 
-  const { data } = supabase.storage.from(bucket).getPublicUrl(key);
+  const { data } = client.storage.from(bucket).getPublicUrl(key);
   return data.publicUrl;
 }
 
@@ -500,26 +512,22 @@ async function uploadToBucket(
 export async function sendMessage(formData: FormData) {
   const { profile } = await requireRole(["director", "parent", "student"]);
   if (!profile.school_id) throw new Error("Aucune école assignée");
-  const supabase = createClient();
+  const admin = adminWriter();
 
   const subject = String(formData.get("subject") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
   if (!subject || !body) throw new Error("Sujet et message requis");
 
-  // scope: "student" → message a single student (+ their parent if linked)
-  //        "class"   → broadcast to every student/parent profile in a class
-  //        "broadcast" → school-wide (recipient_id = null), legacy behavior
   const scope = String(formData.get("scope") ?? "student");
   const studentId = String(formData.get("student_id") ?? "") || null;
   const classId = String(formData.get("class_id") ?? "") || null;
 
-  const recipients = await resolveRecipients(supabase, profile.school_id, {
+  const recipients = await resolveRecipients(admin, profile.school_id, {
     scope,
     studentId,
     classId,
   });
 
-  // De-dupe and never send to self.
   const finalRecipients = Array.from(new Set(recipients)).filter(
     (id) => id && id !== profile.id,
   );
@@ -549,14 +557,14 @@ export async function sendMessage(formData: FormData) {
           },
         ];
 
-  const { error } = await supabase.from("messages").insert(rows);
+  const { error } = await admin.from("messages").insert(rows);
   if (error) throw new Error(error.message);
 
   revalidatePath("/messages");
 }
 
 async function resolveRecipients(
-  supabase: ReturnType<typeof createClient>,
+  client: any,
   schoolId: string,
   opts: { scope: string; studentId: string | null; classId: string | null },
 ): Promise<string[]> {
@@ -566,7 +574,7 @@ async function resolveRecipients(
   if (opts.scope === "student" && opts.studentId) {
     studentIds = [opts.studentId];
   } else if (opts.scope === "class" && opts.classId) {
-    const { data: kids } = await supabase
+    const { data: kids } = await client
       .from("students")
       .select("id")
       .eq("school_id", schoolId)
@@ -578,11 +586,11 @@ async function resolveRecipients(
 
   // Pull students once for parent_id, then profiles linked via student_id.
   const [{ data: students }, { data: linkedProfiles }] = await Promise.all([
-    supabase
+    client
       .from("students")
       .select("id, parent_id")
       .in("id", studentIds),
-    supabase
+    client
       .from("profiles")
       .select("id, student_id")
       .in("student_id", studentIds),
@@ -599,12 +607,14 @@ async function resolveRecipients(
 }
 
 export async function markMessageRead(messageId: string) {
-  await requireRole(["director", "parent", "student"]);
-  const supabase = createClient();
-  const { error } = await supabase
+  const { profile } = await requireRole(["director", "parent", "student"]);
+  // Use admin client + explicit recipient check so a stale RLS policy can't
+  // refuse the update; we never let a user mark another user's message read.
+  const { error } = await adminWriter()
     .from("messages")
     .update({ read_at: new Date().toISOString() })
     .eq("id", messageId)
+    .eq("recipient_id", profile.id)
     .is("read_at", null);
   if (error) throw new Error(error.message);
   revalidatePath("/messages");

@@ -2,6 +2,11 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function updateSession(request: NextRequest) {
+  // Expose the pathname to server components via a request header. Next.js
+  // doesn't surface route params to server components in the App Router,
+  // and we need it so AppHeader can show the "school name + version" strip
+  // only on /dashboard.
+  request.headers.set("x-next-pathname", request.nextUrl.pathname);
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -18,6 +23,8 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
+          // Preserve the pathname header when supabase rewrites the response.
+          request.headers.set("x-next-pathname", request.nextUrl.pathname);
           response = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options),

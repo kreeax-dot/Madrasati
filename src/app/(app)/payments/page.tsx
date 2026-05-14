@@ -1,5 +1,4 @@
-import { Clock, Wallet } from "lucide-react";
-// Wallet stays for the parent-side hero icon as well.
+import { Check, Clock, Wallet } from "lucide-react";
 import { TopBar } from "@/components/nav/TopBar";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
@@ -108,9 +107,14 @@ export default async function PaymentsPage() {
           </p>
         </div>
       ) : (
-        <div className="card border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
-          <p className="text-sm font-semibold">Aucun paiement à venir 🎉</p>
-          <p className="mt-0.5 text-xs">Tout est à jour.</p>
+        <div className="card flex items-start gap-3 border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+            <Check className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Aucun paiement à venir</p>
+            <p className="mt-0.5 text-xs">Tout est à jour.</p>
+          </div>
         </div>
       )}
 
