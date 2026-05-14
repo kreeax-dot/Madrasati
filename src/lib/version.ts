@@ -2,6 +2,10 @@
 // renders this string + the short git SHA from Vercel so a screenshot is
 // enough to know which build is live.
 //
+//   v14 — fix root cause: PGRST204 on students.avatar_url. Migration v8
+//         adds the column; createStudent decoupled (phase 1 inserts the
+//         row without avatar_url, phase 3 attaches the avatar as a
+//         best-effort UPDATE that can never fail student creation)
 //   v13 — DEBUG MODE: createStudent never throws, returns {ok,error,step,
 //         details}; NewStudentForm surfaces the real Supabase error to the
 //         director instead of the opaque "Server Components render" digest;
@@ -26,7 +30,7 @@
 //
 // Vercel sets VERCEL_GIT_COMMIT_SHA at build time for every deployment. We
 // expose it as NEXT_PUBLIC_* via next.config (or fall back if running locally).
-export const APP_VERSION = "v13";
+export const APP_VERSION = "v14";
 
 export const APP_BUILD_SHA =
   process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local";

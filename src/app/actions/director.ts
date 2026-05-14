@@ -88,20 +88,18 @@ async function getSchoolId() {
 
 // ─── STUDENTS ─────────────────────────────────────────────────────────────────
 /**
- * createStudent — DEBUG version (returns the real error to the client).
+ * createStudent — fully decoupled from the avatar pipeline.
  *
- * No admin-client abstraction, no service-role-key dependency. Plain
- * user-scoped supabase client, RLS as the only authorization layer.
+ * Contract:
+ *   - Phase 1 inserts the student row with ONLY the columns that have
+ *     always existed (school_id, full_name, class_id, date_of_birth).
+ *   - Phase 2 inserts the signup code (separate table).
+ *   - Phase 3 (best-effort) uploads the avatar and UPDATEs the student.
+ *     If the avatar_url column doesn't exist (PGRST204), if the upload
+ *     fails, if storage isn't configured — none of that can prevent
+ *     student creation. We log and move on.
  *
- * Returns:
- *   { ok: true, studentId, code }           on success
- *   { ok: false, error, step, details }     on failure (NEVER throws)
- *
- * The "never throw" contract matters: when a server action throws and a
- * downstream revalidatePath fires, Next.js often surfaces the throw as
- * the opaque "An error occurred in the Server Components render". By
- * returning an object instead, the client component can render the
- * actual error message.
+ * Action never throws — always returns a discriminated result.
  */
 export type CreateStudentResult =
   | { ok: true; studentId: string; code: string }
@@ -142,34 +140,13 @@ export async function createStudent(
     step = "client";
     const supabase = createClient();
 
-    // Avatar is best-effort; never let it block student creation.
-    step = "avatar";
-    let avatarUrl: string | null = null;
-    const avatarFile = formData.get("avatar") as File | null;
-    if (
-      avatarFile &&
-      typeof avatarFile === "object" &&
-      "size" in avatarFile &&
-      avatarFile.size > 0
-    ) {
-      try {
-        avatarUrl = await uploadToBucket(supabase, "avatars", schoolId, avatarFile);
-      } catch (err: any) {
-        console.warn(
-          "[createStudent] avatar upload failed (non-fatal):",
-          err?.message ?? err,
-        );
-        avatarUrl = null;
-      }
-    }
-
+    // ─── PHASE 1 — insert with always-present columns only ──────────────
     step = "insert_student";
     const insertPayload = {
       school_id: schoolId,
       full_name: fullName,
       class_id: classId,
       date_of_birth: dob,
-      avatar_url: avatarUrl,
     };
     console.log("[createStudent] inserting:", insertPayload);
 
@@ -202,15 +179,15 @@ export async function createStudent(
     if (!student) {
       return {
         ok: false,
-        error: "Insert renvoyé sans données (RLS silencieuse ?)",
+        error: "Insertion renvoyée sans données.",
         step,
         details: { payload: insertPayload },
       };
     }
 
+    // ─── PHASE 2 — signup code ──────────────────────────────────────────
     step = "insert_code";
     let code = "";
-    let codeErrSeen: any = null;
     for (let attempt = 0; attempt < 5; attempt++) {
       code = generateCode(7);
       const { error: codeErr } = await supabase.from("student_codes").insert({
@@ -218,33 +195,31 @@ export async function createStudent(
         student_id: student.id,
         school_id: schoolId,
       });
-      if (!codeErr) {
-        codeErrSeen = null;
-        break;
-      }
-      codeErrSeen = codeErr;
+      if (!codeErr) break;
       if (attempt === 4) {
         console.error("[createStudent] student_codes insert failed", codeErr);
+        revalidatePath("/students");
+        revalidatePath("/dashboard");
         return {
           ok: false,
-          error: `Code: ${codeErr.message}`,
+          error: `Élève créé mais code non généré : ${codeErr.message}`,
           step,
           details: {
             code: (codeErr as any).code,
             hint: (codeErr as any).hint,
+            studentId: student.id,
           },
         };
       }
     }
 
+    // ─── PHASE 3 — avatar (best-effort, NEVER fatal) ────────────────────
+    step = "avatar";
+    await maybeAttachAvatar(supabase, schoolId, student.id, formData);
+
     step = "revalidate";
-    try {
-      revalidatePath("/students");
-      revalidatePath("/dashboard");
-    } catch (err) {
-      // revalidatePath should not throw — defensive log only.
-      console.warn("[createStudent] revalidate failed:", err);
-    }
+    revalidatePath("/students");
+    revalidatePath("/dashboard");
 
     return { ok: true, studentId: student.id, code };
   } catch (err: any) {
@@ -260,6 +235,60 @@ export async function createStudent(
       step,
       details: { stack: err?.stack },
     };
+  }
+}
+
+/**
+ * Best-effort avatar attachment. NEVER throws.
+ *
+ *   1. If no file was picked → return immediately.
+ *   2. Upload to storage. Failure → log + return.
+ *   3. UPDATE the student row with `avatar_url`. If the column is missing
+ *      (PGRST204 — schema not migrated yet) → log a hint that
+ *      migration_v8.sql needs to be applied; otherwise log the message.
+ */
+async function maybeAttachAvatar(
+  supabase: ReturnType<typeof createClient>,
+  schoolId: string,
+  studentId: string,
+  formData: FormData,
+): Promise<void> {
+  const avatarFile = formData.get("avatar") as File | null;
+  if (
+    !avatarFile ||
+    typeof avatarFile !== "object" ||
+    !("size" in avatarFile) ||
+    avatarFile.size === 0
+  ) {
+    return;
+  }
+
+  let url: string;
+  try {
+    url = await uploadToBucket(supabase, "avatars", schoolId, avatarFile);
+  } catch (err: any) {
+    console.warn(
+      "[createStudent] avatar upload failed (non-fatal):",
+      err?.message ?? err,
+    );
+    return;
+  }
+
+  const { error } = await supabase
+    .from("students")
+    .update({ avatar_url: url })
+    .eq("id", studentId);
+  if (error) {
+    if ((error as any).code === "PGRST204") {
+      console.warn(
+        "[createStudent] students.avatar_url column missing. Apply supabase/migration_v8.sql in Supabase to enable student photos. The student row itself was created successfully.",
+      );
+    } else {
+      console.warn(
+        "[createStudent] avatar UPDATE failed (non-fatal):",
+        error.message,
+      );
+    }
   }
 }
 
