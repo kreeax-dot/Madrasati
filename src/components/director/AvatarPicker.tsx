@@ -64,7 +64,6 @@ export function AvatarPicker({
         type="file"
         name={name}
         accept="image/*"
-        capture="environment"
         className="hidden"
         onChange={onPick}
       />

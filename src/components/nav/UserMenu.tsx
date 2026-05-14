@@ -1,17 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { Globe, X } from "lucide-react";
 import { LogoutButton } from "./LogoutButton";
 import { initials } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
 import type { UserRole } from "@/types/database";
-
-const roleLabels: Record<UserRole, string> = {
-  super_admin: "Super admin",
-  director: "Directeur",
-  parent: "Parent",
-  student: "Élève",
-};
 
 export function UserMenu({
   fullName,
@@ -22,8 +16,18 @@ export function UserMenu({
   email: string;
   role: UserRole;
 }) {
+  const { locale, setLocale, t } = useTranslation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  const roleLabel =
+    role === "super_admin"
+      ? t("role.super_admin")
+      : role === "director"
+        ? t("role.director")
+        : role === "parent"
+          ? t("role.parent")
+          : t("role.student");
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -63,7 +67,7 @@ export function UserMenu({
                 </p>
                 <p className="truncate text-xs text-slate-500">{email}</p>
                 <p className="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-600">
-                  {roleLabels[role]}
+                  {roleLabel}
                 </p>
               </div>
               <button
@@ -74,6 +78,36 @@ export function UserMenu({
               >
                 <X className="h-4 w-4" />
               </button>
+            </div>
+            <div className="border-b border-slate-100 p-3">
+              <p className="mb-2 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <Globe className="h-3 w-3" />
+                {t("lang.label")}
+              </p>
+              <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+                <button
+                  type="button"
+                  onClick={() => setLocale("fr")}
+                  className={`rounded-lg py-1.5 text-sm font-medium transition ${
+                    locale === "fr"
+                      ? "bg-white text-slate-900 shadow-soft"
+                      : "text-slate-500"
+                  }`}
+                >
+                  {t("lang.french")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLocale("ar")}
+                  className={`rounded-lg py-1.5 text-sm font-medium transition ${
+                    locale === "ar"
+                      ? "bg-white text-slate-900 shadow-soft"
+                      : "text-slate-500"
+                  }`}
+                >
+                  {t("lang.arabic")}
+                </button>
+              </div>
             </div>
             <div className="p-2">
               <LogoutButton variant="menu" />

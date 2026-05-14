@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Users, GraduationCap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient, hasServiceRoleKey } from "@/lib/supabase/admin";
 import { getSessionProfile } from "@/lib/auth";
 import { getCurrentSchool } from "@/lib/school";
 import { features, type FeatureKey } from "@/lib/features";
@@ -17,10 +17,15 @@ export default async function DashboardPage() {
   const isDirector = profile.role === "director";
   const isStudent = profile.role === "student";
 
-  // For director counters, use the admin client + explicit school_id filter
-  // to immunise against any RLS / current_school_id drift.
-  const reader =
-    isDirector && profile.school_id ? createAdminClient() : supabase;
+  // For director counters: admin client if available, user client otherwise.
+  let reader: any = supabase;
+  if (isDirector && profile.school_id && hasServiceRoleKey()) {
+    try {
+      reader = createAdminClient();
+    } catch {
+      reader = supabase;
+    }
+  }
 
   // Counters (role-aware students count).
   const studentsQ = isDirector

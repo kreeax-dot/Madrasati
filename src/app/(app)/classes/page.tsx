@@ -2,15 +2,22 @@ import Link from "next/link";
 import { GraduationCap, Plus } from "lucide-react";
 import { TopBar } from "@/components/nav/TopBar";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient, hasServiceRoleKey } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth";
 import { ClassesList } from "@/components/director/ClassesList";
 
 export default async function ClassesPage() {
   const { profile } = await requireRole(["director"]);
 
-  // Use admin client to avoid any RLS drift hiding the director's classes.
-  const reader = profile.school_id ? createAdminClient() : createClient();
+  // Admin client when available, user client otherwise — RLS still scopes.
+  let reader: any = createClient();
+  if (profile.school_id && hasServiceRoleKey()) {
+    try {
+      reader = createAdminClient();
+    } catch {
+      reader = createClient();
+    }
+  }
 
   let classesQuery = reader.from("classes").select("id, name, level").order("name");
   let countsQuery = reader.from("students").select("class_id");

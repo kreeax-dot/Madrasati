@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Loader2, LogOut } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
 
 /**
  * Hard logout:
@@ -20,6 +21,7 @@ export function LogoutButton({
 }: {
   variant?: "icon" | "menu";
 }) {
+  const { t } = useTranslation();
   const [pending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
 
@@ -76,7 +78,7 @@ export function LogoutButton({
         ) : (
           <LogOut className="h-4 w-4" />
         )}
-        Se déconnecter
+        {t("auth.signout")}
       </button>
     );
   }
@@ -88,7 +90,7 @@ export function LogoutButton({
         onClick={() => setConfirming(true)}
         disabled={pending}
         className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-soft border border-slate-100 text-slate-600 active:scale-[0.96]"
-        aria-label="Se déconnecter"
+        aria-label={t("auth.signout")}
       >
         {pending ? (
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -105,10 +107,10 @@ export function LogoutButton({
           <div className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md rounded-t-3xl bg-white p-5 pb-8 shadow-card safe-bottom">
             <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-slate-200" />
             <h3 className="text-base font-semibold text-slate-900">
-              Se déconnecter ?
+              {t("auth.confirmSignout")}
             </h3>
             <p className="mt-1 text-sm text-slate-600">
-              Votre session sera fermée sur cet appareil.
+              {t("auth.confirmSignoutBody")}
             </p>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <button
@@ -117,7 +119,7 @@ export function LogoutButton({
                 disabled={pending}
                 className="btn-ghost"
               >
-                Annuler
+                {t("common.cancel")}
               </button>
               <button
                 type="button"

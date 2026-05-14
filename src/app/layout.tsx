@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { PWARegister } from "@/components/PWARegister";
+import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
 
 export const metadata: Metadata = {
   title: "Madrasati — School Manager",
@@ -33,7 +34,7 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className="min-h-dvh bg-slate-50 text-slate-900">
-        {children}
+        <LanguageProvider>{children}</LanguageProvider>
         <PWARegister />
       </body>
     </html>

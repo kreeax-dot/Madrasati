@@ -2,7 +2,7 @@ import Link from "next/link";
 import { UserPlus, Users } from "lucide-react";
 import { TopBar } from "@/components/nav/TopBar";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient, hasServiceRoleKey } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth";
 import { StudentsExplorer } from "@/components/director/StudentsExplorer";
 
@@ -16,7 +16,14 @@ export default async function StudentsPage() {
   // school_id filter ourselves — role + school check is done by requireRole
   // and the layout's NotProvisioned guard.
   const supabase = createClient();
-  const reader = isDirector && profile.school_id ? createAdminClient() : supabase;
+  let reader: any = supabase;
+  if (isDirector && profile.school_id && hasServiceRoleKey()) {
+    try {
+      reader = createAdminClient();
+    } catch {
+      reader = supabase;
+    }
+  }
 
   let studentsQuery = reader
     .from("students")

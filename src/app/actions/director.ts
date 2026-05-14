@@ -3,22 +3,34 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient, hasServiceRoleKey } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth";
 import { generateCode } from "@/lib/codes";
 
 /**
- * All director-side write actions go through this. Role + school are
- * verified by `requireRole + getSchoolId` above, so it's safe — we then
- * use the admin client to write, sidestepping any RLS drift that has
- * historically hidden / blocked writes for legitimate directors.
+ * Returns the best available writer client for a director-side action.
  *
- * Reads stay on the user-scoped client where possible so RLS keeps
- * defense in depth; the few read paths that matter for the director
- * (students list, dashboard counters) already use the admin client.
+ * If the SUPABASE_SERVICE_ROLE_KEY env var is configured (recommended), we
+ * use the admin client — which bypasses RLS and immunises director writes
+ * against any RLS / current_school_id drift. Role + school have already
+ * been verified by `requireRole + getSchoolId` upstream of every caller.
+ *
+ * If the key is missing, we fall back to the user-scoped client so writes
+ * still work via the RLS policies (defense in depth). Better than crashing
+ * with "SUPABASE_SERVICE_ROLE_KEY is missing".
  */
 function adminWriter() {
-  return createAdminClient();
+  if (hasServiceRoleKey()) {
+    try {
+      return createAdminClient();
+    } catch (err) {
+      console.warn(
+        "[adminWriter] admin client construction failed, falling back to user client:",
+        err,
+      );
+    }
+  }
+  return createClient();
 }
 
 // ─── CLASSES ──────────────────────────────────────────────────────────────────
@@ -608,8 +620,6 @@ async function resolveRecipients(
 
 export async function markMessageRead(messageId: string) {
   const { profile } = await requireRole(["director", "parent", "student"]);
-  // Use admin client + explicit recipient check so a stale RLS policy can't
-  // refuse the update; we never let a user mark another user's message read.
   const { error } = await adminWriter()
     .from("messages")
     .update({ read_at: new Date().toISOString() })
@@ -618,4 +628,24 @@ export async function markMessageRead(messageId: string) {
     .is("read_at", null);
   if (error) throw new Error(error.message);
   revalidatePath("/messages");
+}
+
+/**
+ * Marks every still-unread message addressed to the current user as read.
+ * Called by the bell's "Tout marquer comme lu" footer button — actually
+ * clears the unread badge in DB, not just localStorage.
+ */
+export async function markAllNotificationsRead() {
+  const { profile } = await requireRole(["director", "parent", "student"]);
+  const { error } = await adminWriter()
+    .from("messages")
+    .update({ read_at: new Date().toISOString() })
+    .eq("recipient_id", profile.id)
+    .is("read_at", null);
+  if (error) {
+    // Non-fatal — the localStorage lastSeen will still hide them client-side.
+    console.warn("[markAllNotificationsRead]", error);
+  }
+  revalidatePath("/messages");
+  revalidatePath("/dashboard");
 }

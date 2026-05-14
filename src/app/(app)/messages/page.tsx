@@ -2,7 +2,7 @@ import { MessagesSquare } from "lucide-react";
 import { TopBar } from "@/components/nav/TopBar";
 import { Realtime } from "@/components/Realtime";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient, hasServiceRoleKey } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth";
 import { MessagesInbox } from "@/components/messages/MessagesInbox";
 import { MessageComposer } from "@/components/messages/MessageComposer";
@@ -51,15 +51,22 @@ export default async function MessagesPage() {
   let classes: { id: string; name: string }[] = [];
   let students: { id: string; full_name: string; class_id: string | null }[] = [];
   if (isDirector && profile.school_id) {
-    // Admin client → never empty due to RLS drift.
-    const admin = createAdminClient();
+    // Admin client when service-role key is present; user client otherwise.
+    let reader: any = supabase;
+    if (hasServiceRoleKey()) {
+      try {
+        reader = createAdminClient();
+      } catch {
+        reader = supabase;
+      }
+    }
     const [clsRes, stRes] = await Promise.all([
-      admin
+      reader
         .from("classes")
         .select("id, name")
         .eq("school_id", profile.school_id)
         .order("name"),
-      admin
+      reader
         .from("students")
         .select("id, full_name, class_id")
         .eq("school_id", profile.school_id)

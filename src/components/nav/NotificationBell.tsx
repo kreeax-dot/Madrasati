@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { Bell, Inbox, X } from "lucide-react";
+import { Bell, Inbox, Loader2, X } from "lucide-react";
 import { features } from "@/lib/features";
+import { markAllNotificationsRead } from "@/app/actions/director";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
 import type { NotifItem } from "@/lib/notifications";
 
 const STORAGE_PREFIX = "madrasati:notif:lastSeen:";
@@ -28,6 +30,7 @@ export function NotificationBell({
   items: NotifItem[];
   userId: string;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [lastSeen, setLastSeen] = useState<string>("");
@@ -47,6 +50,8 @@ export function NotificationBell({
     [items, lastSeen],
   );
 
+  const [pendingMark, startMark] = useTransition();
+
   const closePanel = useCallback(() => {
     try {
       if (items[0]) {
@@ -58,6 +63,26 @@ export function NotificationBell({
     }
     setOpen(false);
   }, [items, storageKey]);
+
+  // "Mark all as read" — updates DB (messages.read_at) for the current user
+  // AND advances localStorage lastSeen so the badge clears instantly.
+  const markAllRead = useCallback(() => {
+    try {
+      const now = new Date().toISOString();
+      localStorage.setItem(storageKey, now);
+      setLastSeen(now);
+    } catch {
+      /* ignore */
+    }
+    startMark(async () => {
+      try {
+        await markAllNotificationsRead();
+      } catch {
+        /* non-fatal — lastSeen already hides locally */
+      }
+      setOpen(false);
+    });
+  }, [storageKey]);
 
   useEffect(() => {
     if (!open) return;
@@ -132,10 +157,10 @@ export function NotificationBell({
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-3">
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-              Activité récente
+              {t("notif.recentActivity")}
             </p>
             <p className="text-base font-bold text-slate-900">
-              Notifications
+              {t("notif.title")}
               {items.length > 0 && (
                 <span className="ml-1.5 text-xs font-medium text-slate-400">
                   · {items.length}
@@ -160,7 +185,7 @@ export function NotificationBell({
           {items.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-5 py-12 text-slate-400">
               <Inbox className="h-7 w-7" />
-              <p className="text-sm">Aucune notification.</p>
+              <p className="text-sm">{t("notif.empty")}</p>
             </div>
           ) : (
             <ul className="divide-y divide-slate-100">
@@ -218,10 +243,12 @@ export function NotificationBell({
           >
             <button
               type="button"
-              onClick={closePanel}
-              className="w-full rounded-2xl bg-brand-600 py-3 text-sm font-semibold text-white shadow-tile active:scale-[0.98]"
+              onClick={markAllRead}
+              disabled={pendingMark}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-600 py-3 text-sm font-semibold text-white shadow-tile active:scale-[0.98] disabled:opacity-60"
             >
-              Tout marquer comme lu
+              {pendingMark && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t("notif.markAllRead")}
             </button>
           </div>
         )}
@@ -235,7 +262,7 @@ export function NotificationBell({
         type="button"
         onClick={() => setOpen(true)}
         className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-soft border border-slate-100 text-slate-600 active:scale-[0.96]"
-        aria-label="Notifications"
+        aria-label={t("notif.title")}
         aria-haspopup="dialog"
         aria-expanded={open}
       >

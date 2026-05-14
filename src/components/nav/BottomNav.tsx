@@ -14,36 +14,43 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
+import type { DictionaryKey } from "@/lib/i18n/dictionary";
 import type { UserRole } from "@/types/database";
 
-const directorItems = [
-  { href: "/dashboard", label: "Accueil", icon: Home },
-  { href: "/classes", label: "Classes", icon: GraduationCap },
-  { href: "/students", label: "Élèves", icon: Users },
-  { href: "/homework", label: "Devoirs", icon: BookOpen },
-  { href: "/canteen", label: "Cantine", icon: UtensilsCrossed },
+type NavItem = { href: string; key: DictionaryKey; icon: typeof Home };
+
+const directorItems: NavItem[] = [
+  { href: "/dashboard", key: "nav.home", icon: Home },
+  { href: "/classes", key: "nav.classes", icon: GraduationCap },
+  { href: "/students", key: "nav.students", icon: Users },
+  { href: "/homework", key: "nav.homework", icon: BookOpen },
+  { href: "/canteen", key: "nav.canteen", icon: UtensilsCrossed },
 ];
 
-const studentItems = [
-  { href: "/dashboard", label: "Accueil", icon: Home },
-  { href: "/schedule", label: "Horaires", icon: CalendarRange },
-  { href: "/homework", label: "Devoirs", icon: BookOpen },
-  { href: "/canteen", label: "Cantine", icon: UtensilsCrossed },
-  { href: "/absences", label: "Absences", icon: ClipboardList },
+const studentItems: NavItem[] = [
+  { href: "/dashboard", key: "nav.home", icon: Home },
+  { href: "/schedule", key: "nav.schedule", icon: CalendarRange },
+  { href: "/homework", key: "nav.homework", icon: BookOpen },
+  { href: "/canteen", key: "nav.canteen", icon: UtensilsCrossed },
+  { href: "/absences", key: "nav.absences", icon: ClipboardList },
 ];
 
-const parentItems = [
-  { href: "/dashboard", label: "Accueil", icon: Home },
-  { href: "/schedule", label: "Horaires", icon: CalendarRange },
-  { href: "/payments", label: "Paiements", icon: Wallet },
-  { href: "/canteen", label: "Cantine", icon: UtensilsCrossed },
-  { href: "/absences", label: "Absences", icon: ClipboardList },
+const parentItems: NavItem[] = [
+  { href: "/dashboard", key: "nav.home", icon: Home },
+  { href: "/schedule", key: "nav.schedule", icon: CalendarRange },
+  { href: "/payments", key: "nav.payments", icon: Wallet },
+  { href: "/canteen", key: "nav.canteen", icon: UtensilsCrossed },
+  { href: "/absences", key: "nav.absences", icon: ClipboardList },
 ];
 
-const adminItems = [{ href: "/admin", label: "Écoles", icon: SchoolIcon }];
+const adminItems: NavItem[] = [
+  { href: "/admin", key: "nav.home", icon: SchoolIcon },
+];
 
 export function BottomNav({ role }: { role: UserRole }) {
   const pathname = usePathname();
+  const { t } = useTranslation();
   const items =
     role === "director"
       ? directorItems
@@ -59,7 +66,8 @@ export function BottomNav({ role }: { role: UserRole }) {
         className="grid px-2 pt-2"
         style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
       >
-        {items.map(({ href, label, icon: Icon }) => {
+        {items.map(({ href, key, icon: Icon }) => {
+          const label = t(key);
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <li key={href} className="flex justify-center">
