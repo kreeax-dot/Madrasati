@@ -185,9 +185,10 @@ export async function createStudent(
       };
     }
 
-    // ─── PHASE 2 — signup code ──────────────────────────────────────────
+    // ─── PHASE 2 — signup code (atomic: roll back student on hard failure) ─
     step = "insert_code";
     let code = "";
+    let lastCodeErr: any = null;
     for (let attempt = 0; attempt < 5; attempt++) {
       code = generateCode(7);
       const { error: codeErr } = await supabase.from("student_codes").insert({
@@ -195,22 +196,61 @@ export async function createStudent(
         student_id: student.id,
         school_id: schoolId,
       });
-      if (!codeErr) break;
-      if (attempt === 4) {
-        console.error("[createStudent] student_codes insert failed", codeErr);
+      if (!codeErr) {
+        lastCodeErr = null;
+        break;
+      }
+      lastCodeErr = codeErr;
+
+      // Unique-collision errors (23505) are recoverable — just regenerate.
+      // Everything else (table missing, RLS refusal, …) is unrecoverable
+      // and we should roll back the student row immediately.
+      const pgCode = (codeErr as any).code;
+      const isCollision = pgCode === "23505";
+      if (!isCollision || attempt === 4) {
+        console.error("[createStudent] student_codes insert failed", {
+          pgCode,
+          message: codeErr.message,
+          hint: (codeErr as any).hint,
+          attempt,
+        });
+
+        // Atomic rollback: delete the student we just created so the
+        // director doesn't end up with an orphan row in the list.
+        const { error: rollbackErr } = await supabase
+          .from("students")
+          .delete()
+          .eq("id", student.id);
+        if (rollbackErr) {
+          console.warn(
+            "[createStudent] rollback delete failed — manual cleanup may be needed:",
+            rollbackErr.message,
+            "studentId=" + student.id,
+          );
+        }
+
         revalidatePath("/students");
         revalidatePath("/dashboard");
+
+        const isMissingTable = pgCode === "PGRST205";
         return {
           ok: false,
-          error: `Élève créé mais code non généré : ${codeErr.message}`,
+          error: isMissingTable
+            ? "Table student_codes manquante. Appliquez supabase/migration_v9.sql dans Supabase."
+            : `Code non généré : ${codeErr.message}`,
           step,
           details: {
-            code: (codeErr as any).code,
+            code: pgCode,
             hint: (codeErr as any).hint,
-            studentId: student.id,
+            rolledBack: !rollbackErr,
+            previousStudentId: student.id,
           },
         };
       }
+    }
+    if (lastCodeErr) {
+      // Defensive — shouldn't happen because the loop returns on hard errors.
+      console.error("[createStudent] unexpected code state", lastCodeErr);
     }
 
     // ─── PHASE 3 — avatar (best-effort, NEVER fatal) ────────────────────

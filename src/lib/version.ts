@@ -2,6 +2,9 @@
 // renders this string + the short git SHA from Vercel so a screenshot is
 // enough to know which build is live.
 //
+//   v15 — fix root cause: PGRST205 on student_codes. Migration v9 (re)creates
+//         the table + RLS; createStudent now rolls back the student row if
+//         code generation fails unrecoverably → no orphan students
 //   v14 — fix root cause: PGRST204 on students.avatar_url. Migration v8
 //         adds the column; createStudent decoupled (phase 1 inserts the
 //         row without avatar_url, phase 3 attaches the avatar as a
@@ -30,7 +33,7 @@
 //
 // Vercel sets VERCEL_GIT_COMMIT_SHA at build time for every deployment. We
 // expose it as NEXT_PUBLIC_* via next.config (or fall back if running locally).
-export const APP_VERSION = "v14";
+export const APP_VERSION = "v15";
 
 export const APP_BUILD_SHA =
   process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local";

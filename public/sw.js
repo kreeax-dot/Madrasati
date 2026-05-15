@@ -10,7 +10,7 @@
 // the old build's HTML/JS. The accompanying client (PWARegister.tsx) listens
 // for the `controllerchange` event and reloads.
 
-const VERSION = "v14";
+const VERSION = "v15";
 const HTML_CACHE = `madrasati-html-${VERSION}`;
 const STATIC_CACHE = `madrasati-static-${VERSION}`;
 const ICON_CACHE = `madrasati-icons-${VERSION}`;
