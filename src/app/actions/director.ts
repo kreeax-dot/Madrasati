@@ -873,6 +873,115 @@ async function resolveRecipients(
   return recipients;
 }
 
+/**
+ * Reply to a received message. Allowed for ALL roles (director, parent,
+ * student) — the caller must be the recipient of the original message.
+ * Returns a structured result so the UI shows the real error if any.
+ */
+export type ReplyResult =
+  | { ok: true }
+  | { ok: false; error: string; step: string; details?: Record<string, unknown> };
+
+export async function sendReply(formData: FormData): Promise<ReplyResult> {
+  let step = "init";
+  try {
+    step = "auth";
+    const { profile } = await requireRole(["director", "parent", "student"]);
+    if (!profile.school_id) {
+      return { ok: false, error: "Aucune école assignée.", step };
+    }
+
+    step = "parse";
+    const originalMessageId = String(formData.get("original_message_id") ?? "");
+    const body = String(formData.get("body") ?? "").trim();
+    if (!originalMessageId) {
+      return { ok: false, error: "Message original requis.", step };
+    }
+    if (!body) {
+      return { ok: false, error: "Message vide.", step };
+    }
+
+    step = "load_original";
+    const admin = adminWriter();
+    const { data: original, error: loadErr } = await admin
+      .from("messages")
+      .select("id, school_id, sender_id, recipient_id, subject")
+      .eq("id", originalMessageId)
+      .maybeSingle();
+
+    if (loadErr) {
+      return {
+        ok: false,
+        error: loadErr.message,
+        step,
+        details: { code: (loadErr as any).code },
+      };
+    }
+    if (!original) {
+      return { ok: false, error: "Message introuvable.", step };
+    }
+
+    // Caller must be the recipient of the original message. We never let
+    // someone reply to a message they didn't receive — that would let a
+    // director impersonate a student in a thread.
+    if ((original as any).recipient_id !== profile.id) {
+      return {
+        ok: false,
+        error: "Vous ne pouvez répondre qu'aux messages reçus.",
+        step,
+        details: {
+          callerProfileId: profile.id,
+          originalRecipient: (original as any).recipient_id,
+        },
+      };
+    }
+
+    const subj = (original as any).subject as string;
+    const replySubject = subj.startsWith("Re:") ? subj : `Re: ${subj}`;
+
+    step = "insert_reply";
+    const { error: insertError } = await admin.from("messages").insert({
+      school_id: (original as any).school_id,
+      sender_id: profile.id,
+      recipient_id: (original as any).sender_id,
+      subject: replySubject,
+      body,
+    });
+
+    if (insertError) {
+      console.error("[sendReply] INSERT failed", {
+        message: insertError.message,
+        code: (insertError as any).code,
+        details: (insertError as any).details,
+      });
+      return {
+        ok: false,
+        error: insertError.message,
+        step,
+        details: {
+          code: (insertError as any).code,
+          hint: (insertError as any).hint,
+        },
+      };
+    }
+
+    revalidatePath("/messages");
+    return { ok: true };
+  } catch (err: any) {
+    console.error("[sendReply] UNCAUGHT", {
+      step,
+      message: err?.message,
+      stack: err?.stack,
+    });
+    return {
+      ok: false,
+      error: err?.message ?? "Erreur inconnue",
+      step,
+      details: { stack: err?.stack },
+    };
+  }
+}
+
 export async function markMessageRead(messageId: string) {
   const { profile } = await requireRole(["director", "parent", "student"]);
   const { error } = await adminWriter()

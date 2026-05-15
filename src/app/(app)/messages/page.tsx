@@ -17,7 +17,7 @@ export default async function MessagesPage() {
   // which used to render as "An error occurred in server components render".
   const { data: messagesRaw } = await supabase
     .from("messages")
-    .select("id, sender_id, subject, body, read_at, created_at")
+    .select("id, sender_id, recipient_id, subject, body, read_at, created_at")
     .order("created_at", { ascending: false });
 
   const rawList = (messagesRaw as any[]) ?? [];
@@ -45,6 +45,8 @@ export default async function MessagesPage() {
     sender: m.sender_id
       ? { full_name: senderById.get(m.sender_id) ?? "Système" }
       : null,
+    // Replies only on messages where the current user is the recipient.
+    canReply: m.recipient_id === profile.id,
   }));
 
   const isDirector = profile.role === "director";
