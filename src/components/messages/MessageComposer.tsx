@@ -1,11 +1,26 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Loader2, Plus, Send, Users, User as UserIcon, X } from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
+import {
+  AlertTriangle,
+  Loader2,
+  Plus,
+  Search,
+  Send,
+  Users,
+  User as UserIcon,
+  X,
+} from "lucide-react";
 import { sendMessage } from "@/app/actions/director";
 
 type Cls = { id: string; name: string };
 type Student = { id: string; full_name: string; class_id: string | null };
+
+type DebugError = {
+  message: string;
+  step: string;
+  details?: Record<string, unknown>;
+};
 
 export function MessageComposer({
   classes,
@@ -16,14 +31,26 @@ export function MessageComposer({
 }) {
   const [open, setOpen] = useState(false);
   const [scope, setScope] = useState<"student" | "class">("student");
+  const [studentQuery, setStudentQuery] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState<string>("");
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<DebugError | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  const filteredStudents = useMemo(() => {
+    const q = studentQuery.trim().toLowerCase();
+    if (!q) return students;
+    return students.filter((s) => s.full_name.toLowerCase().includes(q));
+  }, [students, studentQuery]);
+
+  const selectedStudent = students.find((s) => s.id === selectedStudentId);
 
   function close() {
     setOpen(false);
     setError(null);
     setSuccess(null);
+    setStudentQuery("");
+    setSelectedStudentId("");
   }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -32,14 +59,39 @@ export function MessageComposer({
     setSuccess(null);
     const fd = new FormData(e.currentTarget);
     fd.set("scope", scope);
+    if (scope === "student") {
+      if (!selectedStudentId) {
+        setError({ message: "Sélectionnez un élève.", step: "client_validate" });
+        return;
+      }
+      fd.set("student_id", selectedStudentId);
+    }
     startTransition(async () => {
       try {
-        await sendMessage(fd);
-        setSuccess("Message envoyé.");
-        (e.target as HTMLFormElement).reset();
-        setTimeout(() => close(), 900);
+        const res = await sendMessage(fd);
+        if (res.ok) {
+          setSuccess(
+            res.recipientCount === 1
+              ? "Message envoyé."
+              : `Message envoyé à ${res.recipientCount} destinataires.`,
+          );
+          (e.target as HTMLFormElement).reset();
+          setSelectedStudentId("");
+          setStudentQuery("");
+          setTimeout(() => close(), 1000);
+        } else {
+          setError({
+            message: res.error,
+            step: res.step,
+            details: res.details,
+          });
+        }
       } catch (err: any) {
-        setError(err?.message ?? "Erreur");
+        setError({
+          message: err?.message ?? "Erreur inconnue",
+          step: "client_catch",
+          details: { stack: err?.stack },
+        });
       }
     });
   }
@@ -61,7 +113,7 @@ export function MessageComposer({
             onClick={close}
             className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm"
           />
-          <div className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-t-3xl bg-white p-5 pb-8 shadow-card safe-bottom">
+          <div className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md max-h-[92dvh] overflow-y-auto rounded-t-3xl bg-white p-5 pb-8 shadow-card safe-bottom">
             <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-slate-200" />
             <div className="mb-4 flex items-start justify-between">
               <div>
@@ -113,14 +165,62 @@ export function MessageComposer({
               {scope === "student" ? (
                 <div>
                   <label className="label">Élève</label>
-                  <select name="student_id" required className="input">
-                    <option value="">— Sélectionner —</option>
-                    {students.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.full_name}
-                      </option>
-                    ))}
-                  </select>
+                  {selectedStudent ? (
+                    <div className="flex items-center justify-between rounded-xl bg-brand-50 px-3 py-2.5 text-sm">
+                      <span className="truncate font-medium text-brand-900">
+                        {selectedStudent.full_name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedStudentId("")}
+                        className="ml-2 shrink-0 text-xs font-medium text-brand-700"
+                      >
+                        Changer
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={studentQuery}
+                          onChange={(e) => setStudentQuery(e.target.value)}
+                          className="input pl-9"
+                          placeholder="Rechercher un élève par nom…"
+                        />
+                      </div>
+                      {students.length === 0 ? (
+                        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                          Aucun élève dans votre école. Créez-en un d&apos;abord
+                          dans la section Élèves.
+                        </p>
+                      ) : (
+                        <ul className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-slate-200">
+                          {filteredStudents.length === 0 ? (
+                            <li className="px-3 py-4 text-center text-xs text-slate-400">
+                              Aucun résultat.
+                            </li>
+                          ) : (
+                            filteredStudents.map((s) => (
+                              <li key={s.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedStudentId(s.id);
+                                    setStudentQuery("");
+                                  }}
+                                  className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                                >
+                                  {s.full_name}
+                                </button>
+                              </li>
+                            ))
+                          )}
+                        </ul>
+                      )}
+                    </>
+                  )}
                 </div>
               ) : (
                 <div>
@@ -159,11 +259,7 @@ export function MessageComposer({
                 />
               </div>
 
-              {error && (
-                <div className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {error}
-                </div>
-              )}
+              {error && <ErrorPanel error={error} />}
               {success && (
                 <div className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
                   {success}
@@ -187,5 +283,29 @@ export function MessageComposer({
         </>
       )}
     </>
+  );
+}
+
+function ErrorPanel({ error }: { error: DebugError }) {
+  return (
+    <div className="space-y-2 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">Erreur</p>
+          <p className="mt-0.5 break-words font-mono text-xs">{error.message}</p>
+        </div>
+      </div>
+      {error.details && (
+        <details className="text-xs">
+          <summary className="cursor-pointer font-medium text-red-700">
+            Détails techniques (étape : {error.step})
+          </summary>
+          <pre className="mt-2 max-h-40 overflow-auto rounded-lg bg-white/60 p-2 font-mono text-[10px] leading-tight text-red-900">
+            {JSON.stringify(error.details ?? {}, null, 2)}
+          </pre>
+        </details>
+      )}
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import { getSessionProfile } from "@/lib/auth";
 import { getCurrentSchool } from "@/lib/school";
 import { fetchNotifications } from "@/lib/notifications";
 import { APP_BUILD_LABEL } from "@/lib/version";
+import { st } from "@/lib/i18n/server";
 import { LanguageToggle } from "./LanguageToggle";
 import { LogoutButton } from "./LogoutButton";
 import { NotificationBell } from "./NotificationBell";
@@ -36,12 +37,12 @@ export async function AppHeader() {
 
   const subtitle =
     profile.role === "director"
-      ? "Direction"
+      ? st("role.director")
       : profile.role === "student"
-        ? "Élève"
+        ? st("role.student")
         : profile.role === "parent"
-          ? "Parent"
-          : "Admin";
+          ? st("role.parent")
+          : st("role.super_admin");
 
   return (
     <div className="sticky top-0 z-20 w-full bg-slate-50/85 backdrop-blur safe-top">

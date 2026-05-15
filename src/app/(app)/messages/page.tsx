@@ -1,5 +1,6 @@
 import { MessagesSquare } from "lucide-react";
 import { TopBar } from "@/components/nav/TopBar";
+import { st } from "@/lib/i18n/server";
 import { Realtime } from "@/components/Realtime";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient, hasServiceRoleKey } from "@/lib/supabase/admin";
@@ -80,8 +81,12 @@ export default async function MessagesPage() {
     <div className="space-y-5">
       <Realtime tables={["messages"]} />
       <TopBar
-        subtitle={isDirector ? "Communication" : "Boîte de réception"}
-        title="Messages"
+        subtitle={
+          isDirector
+            ? st("page.messages.subtitle.director")
+            : st("page.messages.subtitle.user")
+        }
+        title={st("page.messages.title")}
         icon={<MessagesSquare className="h-5 w-5" />}
         accent="from-blue-500 to-blue-700"
       />

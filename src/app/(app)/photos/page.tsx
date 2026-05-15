@@ -1,5 +1,6 @@
 import { Images } from "lucide-react";
 import { TopBar } from "@/components/nav/TopBar";
+import { st } from "@/lib/i18n/server";
 import { Realtime } from "@/components/Realtime";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
@@ -30,8 +31,8 @@ export default async function PhotosPage() {
     <div className="space-y-5">
       <Realtime tables={["photos"]} />
       <TopBar
-        subtitle="Galerie"
-        title="Photos"
+        subtitle={st("page.photos.subtitle")}
+        title={st("page.photos.title")}
         icon={<Images className="h-5 w-5" />}
         accent="from-cyan-500 to-cyan-700"
       />

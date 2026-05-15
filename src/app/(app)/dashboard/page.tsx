@@ -8,6 +8,7 @@ import { features, type FeatureKey } from "@/lib/features";
 import { formatCurrency, formatDate, initials } from "@/lib/utils";
 import { Realtime } from "@/components/Realtime";
 import { MigrationBanner } from "@/components/director/MigrationBanner";
+import { st } from "@/lib/i18n/server";
 
 export default async function DashboardPage() {
   const { profile } = await getSessionProfile();
@@ -203,7 +204,7 @@ export default async function DashboardPage() {
           )}
           <div className="min-w-0">
             <p className="text-[11px] font-medium uppercase tracking-wider text-white/70">
-              Bonjour
+              {st("dashboard.greeting")}
             </p>
             <h1 className="mt-0.5 text-2xl font-bold leading-tight tracking-tight truncate">
               {(studentAvatar?.name ?? profile.full_name).split(" ")[0]}
@@ -214,17 +215,23 @@ export default async function DashboardPage() {
         <div className="relative mt-4 grid grid-cols-3 gap-3">
           <Stat
             icon={<Users className="h-3.5 w-3.5 text-white/70" />}
-            label={isDirector ? "Élèves" : isStudent ? "Profil" : "Enfants"}
+            label={
+              isDirector
+                ? st("dashboard.stat.students")
+                : isStudent
+                  ? st("dashboard.stat.profile")
+                  : st("dashboard.stat.children")
+            }
             value={studentsCount ?? 0}
           />
           <Stat
             icon={<GraduationCap className="h-3.5 w-3.5 text-white/70" />}
-            label="Impayés"
+            label={st("dashboard.stat.unpaid")}
             value={pendingPayments ?? 0}
           />
           <Stat
             icon={<GraduationCap className="h-3.5 w-3.5 text-white/70" />}
-            label="Messages"
+            label={st("dashboard.stat.messages")}
             value={unread ?? 0}
           />
         </div>
@@ -232,9 +239,11 @@ export default async function DashboardPage() {
 
       <section>
         <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="text-base font-bold text-slate-900">Mes accès</h2>
+          <h2 className="text-base font-bold text-slate-900">
+            {st("dashboard.quickAccess")}
+          </h2>
           <span className="text-xs font-medium text-slate-400">
-            {tiles.length} modules
+            {tiles.length} {st("dashboard.modules")}
           </span>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

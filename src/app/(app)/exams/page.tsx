@@ -1,4 +1,5 @@
 import { GraduationCap, BookOpenCheck } from "lucide-react";
+import { st } from "@/lib/i18n/server";
 import { TopBar } from "@/components/nav/TopBar";
 import { Realtime } from "@/components/Realtime";
 import { createClient } from "@/lib/supabase/server";
@@ -33,8 +34,8 @@ export default async function ExamsPage() {
       <div className="space-y-5">
         <Realtime tables={["exams"]} />
         <TopBar
-          subtitle="Évaluations"
-          title="Examens"
+          subtitle={st("page.exams.subtitle.director")}
+          title={st("page.exams.title")}
           icon={<BookOpenCheck className="h-5 w-5" />}
           accent="from-rose-500 to-rose-700"
         />
@@ -68,8 +69,8 @@ export default async function ExamsPage() {
     <div className="space-y-5">
       <Realtime tables={["exams"]} />
       <TopBar
-        subtitle="À venir"
-        title="Examens"
+        subtitle={st("page.exams.subtitle.user")}
+        title={st("page.exams.title")}
         icon={<BookOpenCheck className="h-5 w-5" />}
         accent="from-rose-500 to-rose-700"
       />

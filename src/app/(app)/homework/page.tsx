@@ -1,5 +1,6 @@
 import { BookOpen } from "lucide-react";
 import { TopBar } from "@/components/nav/TopBar";
+import { st } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
 import { formatDate } from "@/lib/utils";
@@ -31,8 +32,8 @@ export default async function HomeworkPage() {
     return (
       <div className="space-y-5">
         <TopBar
-          subtitle="Devoirs"
-          title="Devoirs à donner"
+          subtitle={st("page.homework.subtitle")}
+          title={st("page.homework.title.director")}
           icon={<BookOpen className="h-5 w-5" />}
           accent="from-purple-500 to-purple-700"
         />
@@ -45,8 +46,8 @@ export default async function HomeworkPage() {
     <div className="space-y-5">
       <Realtime tables={["homework"]} />
       <TopBar
-        subtitle="Devoirs"
-        title="À faire"
+        subtitle={st("page.homework.subtitle")}
+        title={st("page.homework.title.user")}
         icon={<BookOpen className="h-5 w-5" />}
         accent="from-purple-500 to-purple-700"
       />

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { GraduationCap, Plus } from "lucide-react";
 import { TopBar } from "@/components/nav/TopBar";
+import { st } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient, hasServiceRoleKey } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth";
@@ -42,15 +43,15 @@ export default async function ClassesPage() {
   return (
     <div className="space-y-5">
       <TopBar
-        subtitle={`${list.length} classe${list.length > 1 ? "s" : ""}`}
-        title="Classes"
+        subtitle={`${list.length} ${st("page.classes.subtitle.count")}`}
+        title={st("page.classes.title")}
         icon={<GraduationCap className="h-5 w-5" />}
         accent="from-brand-500 to-brand-700"
       />
 
       <Link href="/classes/new" className="btn-primary w-full">
         <Plus className="h-4 w-4" />
-        Créer une classe
+        {st("page.classes.addCta")}
       </Link>
 
       <ClassesList classes={list} counts={tally} />

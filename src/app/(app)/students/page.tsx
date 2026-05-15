@@ -4,6 +4,7 @@ import { TopBar } from "@/components/nav/TopBar";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient, hasServiceRoleKey } from "@/lib/supabase/admin";
 import { requireRole } from "@/lib/auth";
+import { st } from "@/lib/i18n/server";
 import { StudentsExplorer } from "@/components/director/StudentsExplorer";
 
 export default async function StudentsPage() {
@@ -66,9 +67,11 @@ export default async function StudentsPage() {
     <div className="space-y-5">
       <TopBar
         subtitle={
-          isDirector ? `${students.length} élève${students.length > 1 ? "s" : ""}` : "Liste"
+          isDirector
+            ? `${students.length} ${st("page.students.subtitle.count")}`
+            : st("page.students.subtitle.list")
         }
-        title="Élèves"
+        title={st("page.students.title")}
         icon={<Users className="h-5 w-5" />}
         accent="from-emerald-500 to-emerald-700"
       />
@@ -76,7 +79,7 @@ export default async function StudentsPage() {
       {isDirector && (
         <Link href="/students/new" className="btn-primary w-full">
           <UserPlus className="h-4 w-4" />
-          Ajouter un élève
+          {st("page.students.addCta")}
         </Link>
       )}
 

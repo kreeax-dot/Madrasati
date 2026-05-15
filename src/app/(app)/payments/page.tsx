@@ -1,4 +1,5 @@
 import { Check, Clock, Wallet } from "lucide-react";
+import { st } from "@/lib/i18n/server";
 import { TopBar } from "@/components/nav/TopBar";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
@@ -58,8 +59,8 @@ export default async function PaymentsPage() {
       <div className="space-y-5">
         <Realtime tables={["payments"]} />
         <TopBar
-          subtitle="Suivi"
-          title="Paiements"
+          subtitle={st("page.payments.subtitle.director")}
+          title={st("page.payments.title")}
           icon={<Wallet className="h-5 w-5" />}
           accent="from-emerald-500 to-emerald-700"
         />
@@ -87,8 +88,8 @@ export default async function PaymentsPage() {
     <div className="space-y-5">
       <Realtime tables={["payments"]} />
       <TopBar
-        subtitle="Mes paiements"
-        title="Paiements"
+        subtitle={st("page.payments.subtitle.user")}
+        title={st("page.payments.title")}
         icon={<Wallet className="h-5 w-5" />}
         accent="from-emerald-500 to-emerald-700"
       />

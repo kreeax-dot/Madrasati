@@ -698,58 +698,136 @@ async function uploadToBucket(
 }
 
 // ─── MESSAGES ─────────────────────────────────────────────────────────────────
-export async function sendMessage(formData: FormData) {
-  const { profile } = await requireRole(["director", "parent", "student"]);
-  if (!profile.school_id) throw new Error("Aucune école assignée");
-  const admin = adminWriter();
+/**
+ * sendMessage — never throws. Returns a structured result so the client
+ * component can surface the real Supabase error (PG code, hint, payload)
+ * instead of the opaque "Server Components render" digest.
+ */
+export type SendMessageResult =
+  | { ok: true; recipientCount: number }
+  | { ok: false; error: string; step: string; details?: Record<string, unknown> };
 
-  const subject = String(formData.get("subject") ?? "").trim();
-  const body = String(formData.get("body") ?? "").trim();
-  if (!subject || !body) throw new Error("Sujet et message requis");
+export async function sendMessage(formData: FormData): Promise<SendMessageResult> {
+  let step = "init";
+  try {
+    step = "auth";
+    const { profile } = await requireRole(["director", "parent", "student"]);
+    if (!profile.school_id) {
+      return {
+        ok: false,
+        error: "Aucune école assignée.",
+        step,
+        details: { profileId: profile.id, role: profile.role },
+      };
+    }
 
-  const scope = String(formData.get("scope") ?? "student");
-  const studentId = String(formData.get("student_id") ?? "") || null;
-  const classId = String(formData.get("class_id") ?? "") || null;
+    step = "parse";
+    const subject = String(formData.get("subject") ?? "").trim();
+    const body = String(formData.get("body") ?? "").trim();
+    if (!subject || !body) {
+      return { ok: false, error: "Sujet et message requis.", step };
+    }
 
-  const recipients = await resolveRecipients(admin, profile.school_id, {
-    scope,
-    studentId,
-    classId,
-  });
+    const scope = String(formData.get("scope") ?? "student");
+    const studentId = String(formData.get("student_id") ?? "") || null;
+    const classId = String(formData.get("class_id") ?? "") || null;
 
-  const finalRecipients = Array.from(new Set(recipients)).filter(
-    (id) => id && id !== profile.id,
-  );
+    step = "client";
+    const admin = adminWriter();
 
-  if (finalRecipients.length === 0 && scope !== "broadcast") {
-    throw new Error(
-      "Aucun destinataire trouvé. L'élève ou sa famille doit avoir un compte (code de connexion utilisé).",
+    step = "resolve_recipients";
+    const recipients = await resolveRecipients(admin, profile.school_id, {
+      scope,
+      studentId,
+      classId,
+    });
+    const finalRecipients = Array.from(new Set(recipients)).filter(
+      (id) => id && id !== profile.id,
     );
-  }
 
-  const rows =
-    finalRecipients.length > 0
-      ? finalRecipients.map((rid) => ({
-          school_id: profile.school_id!,
-          sender_id: profile.id,
-          recipient_id: rid,
-          subject,
-          body,
-        }))
-      : [
-          {
+    if (finalRecipients.length === 0 && scope !== "broadcast") {
+      return {
+        ok: false,
+        error:
+          "Aucun destinataire trouvé. L'élève ou sa famille doit avoir un compte (code de connexion utilisé).",
+        step,
+        details: { scope, studentId, classId },
+      };
+    }
+
+    step = "insert_messages";
+    const rows =
+      finalRecipients.length > 0
+        ? finalRecipients.map((rid) => ({
             school_id: profile.school_id!,
             sender_id: profile.id,
-            recipient_id: null,
+            recipient_id: rid,
             subject,
             body,
-          },
-        ];
+          }))
+        : [
+            {
+              school_id: profile.school_id!,
+              sender_id: profile.id,
+              recipient_id: null,
+              subject,
+              body,
+            },
+          ];
 
-  const { error } = await admin.from("messages").insert(rows);
-  if (error) throw new Error(error.message);
+    console.log("[sendMessage] inserting", {
+      count: rows.length,
+      scope,
+      studentId,
+      classId,
+    });
 
-  revalidatePath("/messages");
+    const { error: insertError } = await admin.from("messages").insert(rows);
+
+    if (insertError) {
+      console.error("[sendMessage] INSERT FAILED", {
+        message: insertError.message,
+        code: (insertError as any).code,
+        details: (insertError as any).details,
+        hint: (insertError as any).hint,
+      });
+
+      const pgCode = (insertError as any).code;
+      const isMissingTable = pgCode === "PGRST205";
+      const isMissingColumn = pgCode === "PGRST204";
+
+      return {
+        ok: false,
+        error: isMissingTable
+          ? "Table messages introuvable. Appliquez supabase/migration_v10.sql dans Supabase."
+          : isMissingColumn
+            ? `Colonne manquante dans messages : ${insertError.message}. Appliquez supabase/migration_v10.sql.`
+            : insertError.message,
+        step,
+        details: {
+          code: pgCode,
+          hint: (insertError as any).hint,
+          pgDetails: (insertError as any).details,
+          rowCount: rows.length,
+        },
+      };
+    }
+
+    revalidatePath("/messages");
+    return { ok: true, recipientCount: rows.length };
+  } catch (err: any) {
+    console.error("[sendMessage] UNCAUGHT", {
+      step,
+      message: err?.message,
+      stack: err?.stack,
+    });
+    return {
+      ok: false,
+      error: err?.message ?? "Erreur inconnue",
+      step,
+      details: { stack: err?.stack },
+    };
+  }
 }
 
 async function resolveRecipients(

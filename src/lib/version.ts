@@ -2,6 +2,10 @@
 // renders this string + the short git SHA from Vercel so a screenshot is
 // enough to know which build is live.
 //
+//   v16 — full Arabic i18n with RTL (cookie-based locale, server-side `st()`
+//         helper, ~150-key dictionary), email OTP signup (2-phase: send →
+//         verify), sendMessage rewritten with structured-error contract +
+//         search-by-name in the composer
 //   v15 — fix root cause: PGRST205 on student_codes. Migration v9 (re)creates
 //         the table + RLS; createStudent now rolls back the student row if
 //         code generation fails unrecoverably → no orphan students
@@ -33,7 +37,7 @@
 //
 // Vercel sets VERCEL_GIT_COMMIT_SHA at build time for every deployment. We
 // expose it as NEXT_PUBLIC_* via next.config (or fall back if running locally).
-export const APP_VERSION = "v15";
+export const APP_VERSION = "v16";
 
 export const APP_BUILD_SHA =
   process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local";

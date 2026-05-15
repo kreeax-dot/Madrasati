@@ -13,9 +13,14 @@ import {
   Sparkles,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { redeemCodeAndCreateAccount } from "@/app/actions/signup";
+import {
+  requestStudentSignup,
+  verifyStudentSignupOtp,
+  resendStudentSignupOtp,
+} from "@/app/actions/signup";
 
 type Mode = "login" | "code";
+type SignupStep = "form" | "otp";
 
 const ERROR_MESSAGES: Record<string, string> = {
   no_profile:
@@ -43,6 +48,13 @@ function LoginInner() {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Student-code signup is now a 2-step flow: form → OTP.
+  const [signupStep, setSignupStep] = useState<SignupStep>("form");
+  const [otpToken, setOtpToken] = useState("");
+  const [otpEmail, setOtpEmail] = useState("");
+  const [resending, setResending] = useState(false);
+  const [resendOk, setResendOk] = useState(false);
 
   // Surface server-side errors that arrived via ?e=…
   useEffect(() => {
@@ -106,13 +118,39 @@ function LoginInner() {
     fd.set("code", code);
     fd.set("email", email);
     fd.set("password", password);
-    const result = await redeemCodeAndCreateAccount(fd);
+    const result = await requestStudentSignup(fd);
     if (!result.ok) {
       setLoading(false);
-      setError(result.error ?? "Erreur");
+      setError(result.error);
       return;
     }
-    const signin = await supabase.auth.signInWithPassword({ email, password });
+    // OTP sent — move to the verification step.
+    setOtpEmail(result.email);
+    setSignupStep("otp");
+    setOtpToken("");
+    setError(null);
+    setLoading(false);
+  }
+
+  async function handleVerifyOtp(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    const fd = new FormData();
+    fd.set("email", otpEmail);
+    fd.set("token", otpToken);
+    const result = await verifyStudentSignupOtp(fd);
+    if (!result.ok) {
+      setLoading(false);
+      setError(result.error);
+      return;
+    }
+    // Email verified — we have a session now via the OTP. Sign in with
+    // password too, so future logins use the password the user typed.
+    const signin = await supabase.auth.signInWithPassword({
+      email: otpEmail,
+      password,
+    });
     if (signin.error || !signin.data.user) {
       setLoading(false);
       setError(signin.error?.message ?? "Connexion échouée");
@@ -120,6 +158,25 @@ function LoginInner() {
     }
     await postLoginRedirect(signin.data.user.id);
     setLoading(false);
+  }
+
+  async function handleResendOtp() {
+    if (!otpEmail) return;
+    setResending(true);
+    setResendOk(false);
+    setError(null);
+    const res = await resendStudentSignupOtp(otpEmail);
+    setResending(false);
+    if (res.ok) setResendOk(true);
+    else setError(res.error ?? "Erreur");
+  }
+
+  function resetSignup() {
+    setSignupStep("form");
+    setOtpToken("");
+    setOtpEmail("");
+    setResendOk(false);
+    setError(null);
   }
 
   return (
@@ -229,7 +286,7 @@ function LoginInner() {
             Se connecter
           </button>
         </form>
-      ) : (
+      ) : signupStep === "form" ? (
         <form onSubmit={handleCodeSignup} className="mt-6 space-y-4">
           <div>
             <label className="label">Code élève</label>
@@ -276,8 +333,69 @@ function LoginInner() {
             className="btn-primary w-full disabled:opacity-60"
           >
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-            Créer mon compte
+            Recevoir le code par email
           </button>
+          <p className="text-center text-[11px] text-slate-500">
+            Un code à 6 chiffres vous sera envoyé pour vérifier votre email.
+          </p>
+        </form>
+      ) : (
+        <form onSubmit={handleVerifyOtp} className="mt-6 space-y-4">
+          <div className="rounded-2xl bg-brand-50 p-4 text-sm text-brand-900">
+            <p className="font-semibold">Vérifiez votre email</p>
+            <p className="mt-1 text-xs">
+              Nous avons envoyé un code à 6 chiffres à{" "}
+              <span className="font-mono">{otpEmail}</span>. Saisissez-le pour
+              activer votre compte.
+            </p>
+          </div>
+          <div>
+            <label className="label">Code reçu par email</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              required
+              value={otpToken}
+              onChange={(e) =>
+                setOtpToken(e.target.value.replace(/\D/g, "").slice(0, 6))
+              }
+              className="input text-center tracking-[0.5em] font-mono text-lg"
+              placeholder="123456"
+              maxLength={6}
+            />
+          </div>
+          {error && <ErrorBox>{error}</ErrorBox>}
+          {resendOk && !error && (
+            <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              Code renvoyé. Vérifiez votre boîte de réception.
+            </div>
+          )}
+          <button
+            type="submit"
+            disabled={loading || otpToken.length < 6}
+            className="btn-primary w-full disabled:opacity-60"
+          >
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+            Vérifier et créer le compte
+          </button>
+          <div className="flex items-center justify-between gap-3 pt-1 text-xs">
+            <button
+              type="button"
+              onClick={resetSignup}
+              className="font-medium text-slate-600 underline-offset-2 hover:underline"
+            >
+              Modifier l&apos;email
+            </button>
+            <button
+              type="button"
+              onClick={handleResendOtp}
+              disabled={resending}
+              className="font-medium text-brand-700 underline-offset-2 hover:underline disabled:opacity-60"
+            >
+              {resending ? "Envoi…" : "Renvoyer le code"}
+            </button>
+          </div>
         </form>
       )}
     </main>

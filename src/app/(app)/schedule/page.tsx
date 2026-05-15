@@ -1,5 +1,6 @@
 import { CalendarRange } from "lucide-react";
 import { TopBar } from "@/components/nav/TopBar";
+import { st } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
 import { ScheduleEditor } from "@/components/director/ScheduleEditor";
@@ -24,8 +25,8 @@ export default async function SchedulePage() {
       <div className="space-y-5">
         <Realtime tables={["schedules"]} />
         <TopBar
-          subtitle="Emploi du temps"
-          title="Horaires"
+          subtitle={st("page.schedule.subtitle.director")}
+          title={st("page.schedule.title.director")}
           icon={<CalendarRange className="h-5 w-5" />}
           accent="from-orange-500 to-orange-700"
         />
@@ -60,8 +61,8 @@ export default async function SchedulePage() {
     <div className="space-y-5">
       <Realtime tables={["schedules"]} />
       <TopBar
-        subtitle="Cette semaine"
-        title="Emploi du temps"
+        subtitle={st("page.schedule.subtitle.user")}
+        title={st("page.schedule.title.user")}
         icon={<CalendarRange className="h-5 w-5" />}
         accent="from-orange-500 to-orange-700"
       />

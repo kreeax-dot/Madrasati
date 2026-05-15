@@ -1,5 +1,6 @@
 import { UtensilsCrossed } from "lucide-react";
 import { TopBar } from "@/components/nav/TopBar";
+import { st } from "@/lib/i18n/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
 import { CanteenEditor } from "@/components/director/CanteenEditor";
@@ -37,8 +38,8 @@ export default async function CanteenPage() {
       <div className="space-y-5">
         <Realtime tables={["canteen_menus"]} />
         <TopBar
-        subtitle="Cantine"
-        title="Menu de la semaine"
+        subtitle={st("page.canteen.subtitle")}
+        title={st("page.canteen.title")}
         icon={<UtensilsCrossed className="h-5 w-5" />}
         accent="from-amber-500 to-amber-700"
       />
@@ -55,8 +56,8 @@ export default async function CanteenPage() {
     <div className="space-y-5">
       <Realtime tables={["canteen_menus"]} />
       <TopBar
-        subtitle="Cantine"
-        title="Menu de la semaine"
+        subtitle={st("page.canteen.subtitle")}
+        title={st("page.canteen.title")}
         icon={<UtensilsCrossed className="h-5 w-5" />}
         accent="from-amber-500 to-amber-700"
       />
