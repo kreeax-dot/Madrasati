@@ -8,76 +8,85 @@ export interface NotifItem {
   title: string;
   body: string;
   timestamp: string;
+  /** Where clicking this notification should navigate. */
+  href: string;
 }
 
 /**
- * Fetches a unified notification feed scoped to the current user via RLS.
+ * Fetches a unified notification feed for the current user.
  *
- * IMPORTANT: this function is rendered by the AppHeader on EVERY authenticated
- * page. It MUST NOT throw, or the entire (app)/* layout dies with
- * "An error occurred in server components render".
+ * Rules:
+ *   - Items the current user CREATED are filtered out (no "you got
+ *     notified about your own action" noise). For messages: skip rows
+ *     where I'm the sender. For homework/exams/remedials: skip rows
+ *     where created_by = me.
+ *   - Each per-table fetch is wrapped in `safe()` → empty array on
+ *     any error so a missing table can never crash AppHeader.
+ *   - Promise.allSettled isolates failures further.
+ *   - Top-level try/catch is the last-resort guard.
  *
- * Strategy:
- *   1. Each per-table fetch is wrapped in `safe()` → empty array on any error.
- *   2. We use `Promise.allSettled` so one failing query never poisons the rest.
- *   3. Embedded joins are kept minimal; sender names are resolved with a
- *      single follow-up batch query, so we don't depend on a specific FK name
- *      that might mismatch across schema versions.
+ * This function is rendered on EVERY authenticated page (AppHeader), so
+ * it MUST NEVER throw.
  */
-export async function fetchNotifications(limit = 20): Promise<NotifItem[]> {
+export async function fetchNotifications(limit = 30): Promise<NotifItem[]> {
   try {
     const { profile } = await getSessionProfile();
     if (profile.role === "super_admin") return [];
 
     const supabase = createClient();
+    const meId = profile.id;
 
     const settled = await Promise.allSettled([
       safe(() =>
         supabase
           .from("homework")
-          .select("id, subject, title, created_at, classes(name)")
+          .select("id, subject, title, created_at, created_by, class_id")
           .order("created_at", { ascending: false })
           .limit(limit),
       ),
       safe(() =>
+        // Notifications only for messages I RECEIVED, not sent.
         supabase
           .from("messages")
-          .select("id, sender_id, subject, body, created_at")
+          .select("id, sender_id, recipient_id, subject, body, created_at")
+          .eq("recipient_id", meId)
           .order("created_at", { ascending: false })
           .limit(limit),
       ),
       safe(() =>
         supabase
           .from("payments")
-          .select("id, description, amount, status, created_at, students(full_name)")
+          .select("id, description, amount, status, created_at, student_id")
           .order("created_at", { ascending: false })
           .limit(limit),
       ),
       safe(() =>
         supabase
           .from("absences")
-          .select("id, date, reason, created_at, students(full_name)")
+          .select("id, date, reason, created_at, student_id")
           .order("created_at", { ascending: false })
           .limit(limit),
       ),
       safe(() =>
         supabase
           .from("schedules")
-          .select("id, subject, day_of_week, created_at, classes(name)")
+          .select("id, subject, day_of_week, created_at, class_id")
           .order("created_at", { ascending: false })
           .limit(limit),
       ),
       safe(() =>
         supabase
           .from("exams")
-          .select("id, subject, exam_date, created_at, classes(name)")
+          .select("id, subject, exam_date, created_at, created_by, class_id")
           .order("created_at", { ascending: false })
           .limit(limit),
       ),
       safe(() =>
         supabase
           .from("remedials")
-          .select("id, session_date, duration_minutes, reason, created_at, students(full_name)")
+          .select(
+            "id, session_date, duration_minutes, reason, created_at, created_by, student_id",
+          )
           .order("created_at", { ascending: false })
           .limit(limit),
       ),
@@ -87,7 +96,7 @@ export async function fetchNotifications(limit = 20): Promise<NotifItem[]> {
       r.status === "fulfilled" ? r.value : [],
     );
 
-    // Resolve sender names in one batch query — survives any FK rename.
+    // Resolve sender names for received messages.
     const senderIds = Array.from(
       new Set((msg as any[]).map((m: any) => m.sender_id).filter(Boolean)),
     );
@@ -100,19 +109,21 @@ export async function fetchNotifications(limit = 20): Promise<NotifItem[]> {
           .in("id", senderIds);
         (senders ?? []).forEach((s: any) => senderName.set(s.id, s.full_name));
       } catch {
-        /* leave senderName empty — fallback to "Système" below */
+        /* fallback to "Système" below */
       }
     }
 
     const out: NotifItem[] = [];
 
     (hw as any[]).forEach((h) => {
+      if (h.created_by === meId) return; // skip my own
       out.push({
         id: `hw-${h.id}`,
         feature: "homework",
         title: `Nouveau devoir · ${h.subject}`,
-        body: `${h.title}${h.classes?.name ? ` — ${h.classes.name}` : ""}`,
+        body: `${h.title}`,
         timestamp: h.created_at,
+        href: "/homework",
       });
     });
 
@@ -121,8 +132,9 @@ export async function fetchNotifications(limit = 20): Promise<NotifItem[]> {
         id: `msg-${m.id}`,
         feature: "messages",
         title: `Message · ${senderName.get(m.sender_id) ?? "Système"}`,
-        body: m.subject ?? "",
+        body: m.subject ?? m.body ?? "",
         timestamp: m.created_at,
+        href: m.sender_id ? `/messages/${m.sender_id}` : "/messages",
       });
     });
 
@@ -131,8 +143,9 @@ export async function fetchNotifications(limit = 20): Promise<NotifItem[]> {
         id: `pay-${p.id}`,
         feature: "payments",
         title: p.status === "paid" ? "Paiement reçu" : "Nouveau paiement",
-        body: `${p.description ?? ""}${p.students?.full_name ? ` — ${p.students.full_name}` : ""}`,
+        body: `${p.description ?? ""}`,
         timestamp: p.created_at,
+        href: "/payments",
       });
     });
 
@@ -141,8 +154,9 @@ export async function fetchNotifications(limit = 20): Promise<NotifItem[]> {
         id: `abs-${a.id}`,
         feature: "absences",
         title: "Absence enregistrée",
-        body: `${a.students?.full_name ?? ""} — ${a.reason ?? "sans motif"}`,
+        body: `${a.reason ?? "sans motif"}`,
         timestamp: a.created_at,
+        href: "/absences",
       });
     });
 
@@ -151,36 +165,39 @@ export async function fetchNotifications(limit = 20): Promise<NotifItem[]> {
         id: `sch-${s.id}`,
         feature: "schedule",
         title: `Cours ajouté · ${s.subject}`,
-        body: s.classes?.name ?? "",
+        body: "",
         timestamp: s.created_at,
+        href: "/schedule",
       });
     });
 
     (ex as any[]).forEach((e) => {
+      if (e.created_by === meId) return; // skip my own
       out.push({
         id: `ex-${e.id}`,
         feature: "exams",
         title: `Examen · ${e.subject}`,
-        body: `${e.classes?.name ?? ""}${e.exam_date ? ` — ${e.exam_date}` : ""}`,
+        body: `${e.exam_date ?? ""}`,
         timestamp: e.created_at,
+        href: "/exams",
       });
     });
 
     (rem as any[]).forEach((r) => {
+      if (r.created_by === meId) return; // skip my own
       out.push({
         id: `rem-${r.id}`,
         feature: "remedials",
         title: "Rattrapage programmé",
-        body: `${r.students?.full_name ?? ""}${r.session_date ? ` — ${r.session_date}` : ""}`,
+        body: `${r.reason ?? ""}${r.session_date ? ` — ${r.session_date}` : ""}`,
         timestamp: r.created_at,
+        href: "/remedials",
       });
     });
 
     out.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
     return out.slice(0, limit);
   } catch (err) {
-    // Last-resort guard — log to server console (visible in Vercel logs) but
-    // never propagate, so the layout doesn't blow up.
     console.error("[fetchNotifications] swallowed error:", err);
     return [];
   }

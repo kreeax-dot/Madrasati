@@ -45,32 +45,35 @@ export function NotificationBell({
     }
   }, [storageKey]);
 
-  const unread = useMemo(
-    () => items.filter((i) => !lastSeen || i.timestamp > lastSeen).length,
+  // Permanent dismiss: once lastSeen advances, any item whose timestamp
+  // is older than lastSeen is HIDDEN from the panel entirely. Only items
+  // strictly newer than lastSeen are visible.
+  const visibleItems = useMemo(
+    () =>
+      lastSeen ? items.filter((i) => i.timestamp > lastSeen) : items,
     [items, lastSeen],
   );
+  const unread = visibleItems.length;
 
   const [pendingMark, startMark] = useTransition();
 
+  // Closing the panel does NOT mark anything as read. Only the explicit
+  // "Tout marquer comme lu" footer button (markAllRead) advances
+  // lastSeen, which permanently hides everything older than that moment.
   const closePanel = useCallback(() => {
-    try {
-      if (items[0]) {
-        localStorage.setItem(storageKey, items[0].timestamp);
-        setLastSeen(items[0].timestamp);
-      }
-    } catch {
-      /* ignore */
-    }
     setOpen(false);
-  }, [items, storageKey]);
+  }, []);
 
-  // "Mark all as read" — updates DB (messages.read_at) for the current user
-  // AND advances localStorage lastSeen so the badge clears instantly.
+  // "Mark all as read" — permanently dismisses everything older than NOW
+  // from the panel (no reappearing), AND clears the unread `read_at` flag
+  // on every received message in DB.
   const markAllRead = useCallback(() => {
+    // Set lastSeen slightly in the future so even items with timestamps
+    // exactly equal to "now" are dismissed.
+    const cutoff = new Date(Date.now() + 1000).toISOString();
     try {
-      const now = new Date().toISOString();
-      localStorage.setItem(storageKey, now);
-      setLastSeen(now);
+      localStorage.setItem(storageKey, cutoff);
+      setLastSeen(cutoff);
     } catch {
       /* ignore */
     }
@@ -161,9 +164,9 @@ export function NotificationBell({
             </p>
             <p className="text-base font-bold text-slate-900">
               {t("notif.title")}
-              {items.length > 0 && (
+              {visibleItems.length > 0 && (
                 <span className="ml-1.5 text-xs font-medium text-slate-400">
-                  · {items.length}
+                  · {visibleItems.length}
                 </span>
               )}
             </p>
@@ -182,51 +185,45 @@ export function NotificationBell({
           className="overflow-y-auto overscroll-contain"
           style={{ flex: "1 1 auto", minHeight: 0 }}
         >
-          {items.length === 0 ? (
+          {visibleItems.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-5 py-12 text-slate-400">
               <Inbox className="h-7 w-7" />
               <p className="text-sm">{t("notif.empty")}</p>
             </div>
           ) : (
             <ul className="divide-y divide-slate-100">
-              {items.map((n) => {
+              {visibleItems.map((n) => {
                 const f = features[n.feature];
                 const Icon = f.icon;
-                const isNew = !lastSeen || n.timestamp > lastSeen;
                 return (
-                  <li
-                    key={n.id}
-                    className="flex items-start gap-3 px-5 py-3.5"
-                  >
-                    <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${f.gradient} text-white shadow-soft`}
+                  <li key={n.id}>
+                    <a
+                      href={n.href}
+                      onClick={() => setOpen(false)}
+                      className="flex w-full items-start gap-3 px-5 py-3.5 text-left active:bg-slate-50"
                     >
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <p
-                          className={`truncate text-sm ${
-                            isNew
-                              ? "font-semibold text-slate-900"
-                              : "font-medium text-slate-700"
-                          }`}
-                        >
-                          {n.title}
-                        </p>
-                        <span className="shrink-0 text-[11px] text-slate-400">
-                          {timeAgo(n.timestamp)}
-                        </span>
+                      <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${f.gradient} text-white shadow-soft`}
+                      >
+                        <Icon className="h-4 w-4" />
                       </div>
-                      {n.body && (
-                        <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">
-                          {n.body}
-                        </p>
-                      )}
-                    </div>
-                    {isNew && (
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <p className="truncate text-sm font-semibold text-slate-900">
+                            {n.title}
+                          </p>
+                          <span className="shrink-0 text-[11px] text-slate-400">
+                            {timeAgo(n.timestamp)}
+                          </span>
+                        </div>
+                        {n.body && (
+                          <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">
+                            {n.body}
+                          </p>
+                        )}
+                      </div>
                       <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-brand-500" />
-                    )}
+                    </a>
                   </li>
                 );
               })}
@@ -234,7 +231,7 @@ export function NotificationBell({
           )}
         </div>
 
-        {items.length > 0 && (
+        {visibleItems.length > 0 && (
           <div
             className="shrink-0 border-t border-slate-100 bg-white px-5 py-3"
             style={{

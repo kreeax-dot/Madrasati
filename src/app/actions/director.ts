@@ -874,6 +874,105 @@ async function resolveRecipients(
 }
 
 /**
+ * Send a message inside a conversation thread to a specific partner
+ * profile. Both directions (student → director, director → student,
+ * parent → director, etc.) go through here. Used by /messages/[partnerId].
+ */
+export type SendInThreadResult =
+  | { ok: true; messageId: string }
+  | { ok: false; error: string; step: string; details?: Record<string, unknown> };
+
+export async function sendMessageInThread(
+  partnerId: string,
+  body: string,
+): Promise<SendInThreadResult> {
+  let step = "init";
+  try {
+    step = "auth";
+    const { profile } = await requireRole(["director", "parent", "student"]);
+    if (!profile.school_id) {
+      return { ok: false, error: "Aucune école assignée.", step };
+    }
+
+    step = "validate";
+    const trimmed = (body ?? "").trim();
+    if (!trimmed) return { ok: false, error: "Message vide.", step };
+    if (!partnerId || partnerId === profile.id) {
+      return { ok: false, error: "Destinataire invalide.", step };
+    }
+
+    step = "load_partner";
+    const admin = adminWriter();
+    const { data: partner, error: pErr } = await admin
+      .from("profiles")
+      .select("id, school_id")
+      .eq("id", partnerId)
+      .maybeSingle();
+    if (pErr) return { ok: false, error: pErr.message, step };
+    if (!partner) return { ok: false, error: "Destinataire introuvable.", step };
+    if ((partner as any).school_id !== profile.school_id) {
+      return {
+        ok: false,
+        error: "Destinataire dans une autre école.",
+        step,
+      };
+    }
+
+    step = "find_prev_subject";
+    const { data: prev } = await admin
+      .from("messages")
+      .select("subject")
+      .or(
+        `and(sender_id.eq.${profile.id},recipient_id.eq.${partnerId}),and(sender_id.eq.${partnerId},recipient_id.eq.${profile.id})`,
+      )
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const subject = (prev?.[0] as any)?.subject ?? "Conversation";
+
+    step = "insert";
+    const { data: inserted, error: insertError } = await admin
+      .from("messages")
+      .insert({
+        school_id: profile.school_id,
+        sender_id: profile.id,
+        recipient_id: partnerId,
+        subject,
+        body: trimmed,
+      })
+      .select("id")
+      .single();
+
+    if (insertError || !inserted) {
+      return {
+        ok: false,
+        error: insertError?.message ?? "Insertion échouée",
+        step,
+        details: {
+          code: (insertError as any)?.code,
+          hint: (insertError as any)?.hint,
+        },
+      };
+    }
+
+    revalidatePath("/messages");
+    revalidatePath(`/messages/${partnerId}`);
+    return { ok: true, messageId: (inserted as any).id };
+  } catch (err: any) {
+    console.error("[sendMessageInThread] UNCAUGHT", {
+      step,
+      message: err?.message,
+      stack: err?.stack,
+    });
+    return {
+      ok: false,
+      error: err?.message ?? "Erreur inconnue",
+      step,
+      details: { stack: err?.stack },
+    };
+  }
+}
+
+/**
  * Reply to a received message. Allowed for ALL roles (director, parent,
  * student) — the caller must be the recipient of the original message.
  * Returns a structured result so the UI shows the real error if any.

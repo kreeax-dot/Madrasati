@@ -44,6 +44,10 @@ export async function AppHeader() {
           ? st("role.parent")
           : st("role.super_admin");
 
+  // Version badge is a dev affordance — visible to director only.
+  // Student / parent see just the school name.
+  const showVersionBadge = profile.role === "director";
+
   return (
     <div className="sticky top-0 z-20 w-full bg-slate-50/85 backdrop-blur safe-top">
       <div className="mx-auto flex w-full max-w-md items-center justify-between gap-2 px-5 py-3">
@@ -58,12 +62,14 @@ export async function AppHeader() {
               </p>
               <p className="mt-0.5 flex items-center gap-1.5 truncate text-sm font-bold text-slate-900 leading-tight">
                 <span className="truncate">{school?.name ?? "Madrasati"}</span>
-                <span
-                  className="shrink-0 rounded-full bg-brand-50 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-brand-700"
-                  title={APP_BUILD_LABEL}
-                >
-                  {APP_BUILD_LABEL}
-                </span>
+                {showVersionBadge && (
+                  <span
+                    className="shrink-0 rounded-full bg-brand-50 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-brand-700"
+                    title={APP_BUILD_LABEL}
+                  >
+                    {APP_BUILD_LABEL}
+                  </span>
+                )}
               </p>
             </div>
           </Link>

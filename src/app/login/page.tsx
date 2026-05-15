@@ -18,9 +18,15 @@ import {
   verifyStudentSignupOtp,
   resendStudentSignupOtp,
 } from "@/app/actions/signup";
+import {
+  requestPasswordResetOtp,
+  verifyPasswordResetOtp,
+  setNewPasswordAfterReset,
+} from "@/app/actions/password-reset";
 
-type Mode = "login" | "code";
+type Mode = "login" | "code" | "forgot";
 type SignupStep = "form" | "otp";
+type ForgotStep = "email" | "otp" | "password" | "done";
 
 const ERROR_MESSAGES: Record<string, string> = {
   no_profile:
@@ -55,6 +61,12 @@ function LoginInner() {
   const [otpEmail, setOtpEmail] = useState("");
   const [resending, setResending] = useState(false);
   const [resendOk, setResendOk] = useState(false);
+
+  // Forgot password 3-step flow.
+  const [forgotStep, setForgotStep] = useState<ForgotStep>("email");
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotToken, setForgotToken] = useState("");
+  const [forgotNewPassword, setForgotNewPassword] = useState("");
 
   // Surface server-side errors that arrived via ?e=…
   useEffect(() => {
@@ -179,6 +191,62 @@ function LoginInner() {
     setError(null);
   }
 
+  // ─── FORGOT PASSWORD ──────────────────────────────────────────────────
+  async function handleForgotRequest(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    const res = await requestPasswordResetOtp(forgotEmail);
+    setLoading(false);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setForgotToken("");
+    setForgotStep("otp");
+  }
+
+  async function handleForgotVerify(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    const res = await verifyPasswordResetOtp(forgotEmail, forgotToken);
+    setLoading(false);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setForgotNewPassword("");
+    setForgotStep("password");
+  }
+
+  async function handleForgotSet(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    const res = await setNewPasswordAfterReset(forgotNewPassword);
+    setLoading(false);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setForgotStep("done");
+    // User is already signed in from the OTP verification. Redirect.
+    setTimeout(() => {
+      router.replace("/dashboard");
+      router.refresh();
+    }, 800);
+  }
+
+  function resetForgot() {
+    setMode("login");
+    setForgotStep("email");
+    setForgotEmail("");
+    setForgotToken("");
+    setForgotNewPassword("");
+    setError(null);
+  }
+
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pt-6 pb-8 safe-top safe-bottom">
       <Link
@@ -219,36 +287,38 @@ function LoginInner() {
         </div>
       </section>
 
-      <div className="mt-6 grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 text-sm font-medium">
-        <button
-          type="button"
-          onClick={() => {
-            setMode("login");
-            setError(null);
-          }}
-          className={`flex items-center justify-center gap-2 rounded-xl py-2.5 transition ${
-            mode === "login"
-              ? "bg-white text-slate-900 shadow-soft"
-              : "text-slate-500"
-          }`}
-        >
-          <LogIn className="h-4 w-4" /> Connexion
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setMode("code");
-            setError(null);
-          }}
-          className={`flex items-center justify-center gap-2 rounded-xl py-2.5 transition ${
-            mode === "code"
-              ? "bg-white text-slate-900 shadow-soft"
-              : "text-slate-500"
-          }`}
-        >
-          <KeyRound className="h-4 w-4" /> Code élève
-        </button>
-      </div>
+      {mode !== "forgot" && (
+        <div className="mt-6 grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 text-sm font-medium">
+          <button
+            type="button"
+            onClick={() => {
+              setMode("login");
+              setError(null);
+            }}
+            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 transition ${
+              mode === "login"
+                ? "bg-white text-slate-900 shadow-soft"
+                : "text-slate-500"
+            }`}
+          >
+            <LogIn className="h-4 w-4" /> Connexion
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("code");
+              setError(null);
+            }}
+            className={`flex items-center justify-center gap-2 rounded-xl py-2.5 transition ${
+              mode === "code"
+                ? "bg-white text-slate-900 shadow-soft"
+                : "text-slate-500"
+            }`}
+          >
+            <KeyRound className="h-4 w-4" /> Code élève
+          </button>
+        </div>
+      )}
 
       {mode === "login" ? (
         <form onSubmit={handleLogin} className="mt-6 space-y-4">
@@ -285,7 +355,35 @@ function LoginInner() {
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             Se connecter
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("forgot");
+              setForgotEmail(email);
+              setForgotStep("email");
+              setError(null);
+            }}
+            className="block w-full text-center text-xs font-medium text-brand-700 underline-offset-2 hover:underline"
+          >
+            Mot de passe oublié ?
+          </button>
         </form>
+      ) : mode === "forgot" ? (
+        <ForgotPasswordSection
+          step={forgotStep}
+          email={forgotEmail}
+          setEmail={setForgotEmail}
+          token={forgotToken}
+          setToken={setForgotToken}
+          newPassword={forgotNewPassword}
+          setNewPassword={setForgotNewPassword}
+          loading={loading}
+          error={error}
+          onRequest={handleForgotRequest}
+          onVerify={handleForgotVerify}
+          onSet={handleForgotSet}
+          onBackToLogin={resetForgot}
+        />
       ) : signupStep === "form" ? (
         <form onSubmit={handleCodeSignup} className="mt-6 space-y-4">
           <div>
@@ -407,6 +505,148 @@ function ErrorBox({ children }: { children: React.ReactNode }) {
     <div className="flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
       <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
       <span>{children}</span>
+    </div>
+  );
+}
+
+function ForgotPasswordSection({
+  step,
+  email,
+  setEmail,
+  token,
+  setToken,
+  newPassword,
+  setNewPassword,
+  loading,
+  error,
+  onRequest,
+  onVerify,
+  onSet,
+  onBackToLogin,
+}: {
+  step: ForgotStep;
+  email: string;
+  setEmail: (v: string) => void;
+  token: string;
+  setToken: (v: string) => void;
+  newPassword: string;
+  setNewPassword: (v: string) => void;
+  loading: boolean;
+  error: string | null;
+  onRequest: (e: React.FormEvent) => void;
+  onVerify: (e: React.FormEvent) => void;
+  onSet: (e: React.FormEvent) => void;
+  onBackToLogin: () => void;
+}) {
+  return (
+    <div className="mt-6 space-y-4">
+      <div className="rounded-2xl bg-brand-50 p-4 text-sm text-brand-900">
+        <p className="font-semibold">Réinitialisation du mot de passe</p>
+        <p className="mt-1 text-xs">
+          {step === "email" &&
+            "Entrez l'email de votre compte. Nous vous enverrons un code à 6 chiffres."}
+          {step === "otp" &&
+            "Entrez le code à 6 chiffres reçu par email pour confirmer votre identité."}
+          {step === "password" &&
+            "Choisissez votre nouveau mot de passe."}
+          {step === "done" && "Mot de passe modifié. Redirection…"}
+        </p>
+      </div>
+
+      {step === "email" && (
+        <form onSubmit={onRequest} className="space-y-3">
+          <div>
+            <label className="label">Email</label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="input"
+              placeholder="vous@exemple.com"
+            />
+          </div>
+          {error && <ErrorBox>{error}</ErrorBox>}
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn-primary w-full disabled:opacity-60"
+          >
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+            Envoyer le code
+          </button>
+        </form>
+      )}
+
+      {step === "otp" && (
+        <form onSubmit={onVerify} className="space-y-3">
+          <div>
+            <label className="label">Code reçu</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              required
+              value={token}
+              onChange={(e) =>
+                setToken(e.target.value.replace(/\D/g, "").slice(0, 6))
+              }
+              className="input text-center tracking-[0.5em] font-mono text-lg"
+              placeholder="123456"
+              maxLength={6}
+            />
+          </div>
+          {error && <ErrorBox>{error}</ErrorBox>}
+          <button
+            type="submit"
+            disabled={loading || token.length < 6}
+            className="btn-primary w-full disabled:opacity-60"
+          >
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+            Vérifier
+          </button>
+        </form>
+      )}
+
+      {step === "password" && (
+        <form onSubmit={onSet} className="space-y-3">
+          <div>
+            <label className="label">Nouveau mot de passe</label>
+            <input
+              type="password"
+              required
+              minLength={6}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="input"
+              placeholder="min. 6 caractères"
+            />
+          </div>
+          {error && <ErrorBox>{error}</ErrorBox>}
+          <button
+            type="submit"
+            disabled={loading || newPassword.length < 6}
+            className="btn-primary w-full disabled:opacity-60"
+          >
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+            Définir le mot de passe
+          </button>
+        </form>
+      )}
+
+      {step === "done" && (
+        <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          Mot de passe modifié. Vous êtes connecté.
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={onBackToLogin}
+        className="block w-full text-center text-xs font-medium text-slate-600 underline-offset-2 hover:underline"
+      >
+        Retour à la connexion
+      </button>
     </div>
   );
 }

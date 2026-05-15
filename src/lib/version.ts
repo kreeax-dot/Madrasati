@@ -2,6 +2,10 @@
 // renders this string + the short git SHA from Vercel so a screenshot is
 // enough to know which build is live.
 //
+//   v18 — chat-style conversations (/messages list grouped by partner +
+//         /messages/[partnerId] thread), notifications scoped + permanent
+//         dismiss + clickable, version badge director-only, student email
+//         on director detail, forgot-password OTP flow (3 steps)
 //   v17 — fix PGRST205 on messages: migration v10 creates the table + RLS
 //         + realtime; sendReply action lets student/parent reply to a
 //         received message; MessagesInbox renders a Reply box on each
@@ -41,7 +45,7 @@
 //
 // Vercel sets VERCEL_GIT_COMMIT_SHA at build time for every deployment. We
 // expose it as NEXT_PUBLIC_* via next.config (or fall back if running locally).
-export const APP_VERSION = "v17";
+export const APP_VERSION = "v18";
 
 export const APP_BUILD_SHA =
   process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local";

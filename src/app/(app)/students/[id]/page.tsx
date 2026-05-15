@@ -33,6 +33,24 @@ export default async function StudentDetailPage({
   }
   (student as any).classes = className ? { name: className } : null;
 
+  // Look up the profile linked to this student (if the family has used the
+  // signup code). Surfaces the email + a tiny "compte créé" indicator on
+  // the director's detail page.
+  let linkedProfile: { email: string; full_name: string } | null = null;
+  {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("email, full_name")
+      .eq("student_id", params.id)
+      .maybeSingle();
+    if (prof) {
+      linkedProfile = {
+        email: (prof as any).email,
+        full_name: (prof as any).full_name,
+      };
+    }
+  }
+
   const [
     { data: payments },
     { data: absences },
@@ -92,6 +110,34 @@ export default async function StudentDetailPage({
           </p>
         </div>
       </header>
+
+      {linkedProfile && (
+        <div className="card flex items-center gap-3 border-emerald-200 bg-emerald-50 p-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+            >
+              <path d="M4 4h16v16H4z" />
+              <path d="m4 7 8 6 8-6" />
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">
+              Compte connecté
+            </p>
+            <p className="truncate text-sm font-medium text-emerald-900">
+              {linkedProfile.email}
+            </p>
+          </div>
+        </div>
+      )}
 
       <StudentQuickActions
         studentId={student.id}
