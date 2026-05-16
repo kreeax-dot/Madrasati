@@ -2,6 +2,13 @@
 // renders this string + the short git SHA from Vercel so a screenshot is
 // enough to know which build is live.
 //
+//   v19 — NUCLEAR PWA cache reset: new SW deletes every previous cache on
+//         activation, hard-reloads all controlled clients via postMessage,
+//         passthrough fetch for HTML (no cache at all). PWARegister now
+//         calls reg.update() with updateViaCache:"none", hard-reloads on
+//         controllerchange with a cache-busting query param. /force-update
+//         escape route unregisters every SW + clears every cache + clears
+//         storage + drops IndexedDB + redirects to /login.
 //   v18 — chat-style conversations (/messages list grouped by partner +
 //         /messages/[partnerId] thread), notifications scoped + permanent
 //         dismiss + clickable, version badge director-only, student email
@@ -45,7 +52,7 @@
 //
 // Vercel sets VERCEL_GIT_COMMIT_SHA at build time for every deployment. We
 // expose it as NEXT_PUBLIC_* via next.config (or fall back if running locally).
-export const APP_VERSION = "v18";
+export const APP_VERSION = "v19";
 
 export const APP_BUILD_SHA =
   process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local";
