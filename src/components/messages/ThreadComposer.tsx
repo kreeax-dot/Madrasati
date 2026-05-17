@@ -4,9 +4,11 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Loader2, Send } from "lucide-react";
 import { sendMessageInThread } from "@/app/actions/director";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
 
 export function ThreadComposer({ partnerId }: { partnerId: string }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [body, setBody] = useState("");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +49,7 @@ export function ThreadComposer({ partnerId }: { partnerId: string }) {
           onChange={(e) => setBody(e.target.value)}
           rows={2}
           className="input resize-none text-sm"
-          placeholder="Votre message…"
+          placeholder={t("msg.threadInputPlaceholder")}
           maxLength={2000}
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -59,7 +61,7 @@ export function ThreadComposer({ partnerId }: { partnerId: string }) {
         <button
           type="submit"
           disabled={pending || !body.trim()}
-          aria-label="Envoyer"
+          aria-label={t("msg.threadSend")}
           className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-tile disabled:opacity-60"
         >
           {pending ? (

@@ -189,7 +189,40 @@ export const fr = {
   "msg.changeStudent": "Changer",
   "msg.sent": "Message envoyé.",
   "msg.empty": "Aucun message pour le moment.",
+  "msg.emptyConversations": "Aucune conversation.",
   "msg.inboxSubtitle": "Boîte de réception",
+  "msg.yousent": "Vous : ",
+  "msg.threadEmpty": "Aucun message. Tapez votre premier message ci-dessous.",
+  "msg.threadInputPlaceholder": "Votre message…",
+  "msg.threadSend": "Envoyer",
+  "msg.reply": "Répondre",
+
+  // student form
+  "student.firstName": "Prénom",
+  "student.lastName": "Nom",
+  "student.dob": "Date de naissance",
+  "student.class": "Classe",
+  "student.noClass": "— Aucune classe —",
+  "student.photo": "Photo de profil",
+  "student.create": "Créer l'élève + générer le code",
+  "student.created": "Élève créé",
+  "student.giveCode": "Donnez ce code à l'élève pour qu'il crée son compte :",
+  "student.copyCode": "Copier le code",
+  "student.copied": "Copié",
+  "student.addAnother": "Ajouter un autre",
+  "student.seeList": "Voir la liste",
+  "student.linkedAccount": "Compte connecté",
+  "student.codeHint":
+    "Code à usage unique. À utiliser sur la page de connexion → onglet « Code élève ».",
+
+  // signup OTP screen extras
+  "signup.checkEmail": "Vérifiez votre email",
+  "signup.codeSentTo": "Nous avons envoyé un code à 6 chiffres à",
+  "signup.codeSentEnd": "Saisissez-le pour activer votre compte.",
+  "signup.spamHint": "Pas de code reçu ? Vérifiez vos spams.",
+
+  // generic
+  "generic.return": "Retour",
 } as const;
 
 export type DictionaryKey = keyof typeof fr;
@@ -379,7 +412,40 @@ export const ar: Partial<Dictionary> = {
   "msg.changeStudent": "تغيير",
   "msg.sent": "تم إرسال الرسالة.",
   "msg.empty": "لا توجد رسائل حاليًا.",
+  "msg.emptyConversations": "لا توجد محادثات.",
   "msg.inboxSubtitle": "صندوق الوارد",
+  "msg.yousent": "أنت : ",
+  "msg.threadEmpty": "لا توجد رسائل. اكتب رسالتك الأولى في الأسفل.",
+  "msg.threadInputPlaceholder": "رسالتك…",
+  "msg.threadSend": "إرسال",
+  "msg.reply": "رد",
+
+  // student form
+  "student.firstName": "الاسم",
+  "student.lastName": "اللقب",
+  "student.dob": "تاريخ الميلاد",
+  "student.class": "القسم",
+  "student.noClass": "— بدون قسم —",
+  "student.photo": "صورة الملف الشخصي",
+  "student.create": "إنشاء التلميذ + توليد الرمز",
+  "student.created": "تم إنشاء التلميذ",
+  "student.giveCode": "اعطِ هذا الرمز للتلميذ لإنشاء حسابه :",
+  "student.copyCode": "نسخ الرمز",
+  "student.copied": "تم النسخ",
+  "student.addAnother": "إضافة تلميذ آخر",
+  "student.seeList": "عرض القائمة",
+  "student.linkedAccount": "حساب مرتبط",
+  "student.codeHint":
+    "رمز للاستعمال مرة واحدة. يُستخدم في صفحة تسجيل الدخول ← لسان « رمز التلميذ ».",
+
+  // signup OTP screen extras
+  "signup.checkEmail": "تحقق من بريدك الإلكتروني",
+  "signup.codeSentTo": "أرسلنا رمزًا من 6 أرقام إلى",
+  "signup.codeSentEnd": "أدخله لتفعيل حسابك.",
+  "signup.spamHint": "لم تستلم الرمز ؟ تحقق من البريد المهمل.",
+
+  // generic
+  "generic.return": "رجوع",
 };
 
 export type Locale = "fr" | "ar";

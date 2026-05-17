@@ -203,8 +203,8 @@ export default async function DashboardPage() {
             </div>
           )}
           <div className="min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-white/70">
-              {st("dashboard.greeting")}
+            <p className="text-[11px] font-medium uppercase tracking-wider text-white/70 truncate">
+              {school?.name ?? st("dashboard.greeting")}
             </p>
             <h1 className="mt-0.5 text-2xl font-bold leading-tight tracking-tight truncate">
               {(studentAvatar?.name ?? profile.full_name).split(" ")[0]}

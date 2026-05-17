@@ -446,6 +446,11 @@ function LoginInner() {
               <span className="font-mono">{otpEmail}</span>. Saisissez-le pour
               activer votre compte.
             </p>
+            <p className="mt-2 text-[10px] text-brand-800/70">
+              Pas de code reçu ? Vérifiez vos spams. Vous recevez un lien au lieu
+              d&apos;un code ? Le template email Supabase doit utiliser
+              <span className="font-mono"> {"{{ .Token }}"} </span>.
+            </p>
           </div>
           <div>
             <label className="label">Code reçu par email</label>

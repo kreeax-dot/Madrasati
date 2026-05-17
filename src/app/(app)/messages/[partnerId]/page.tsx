@@ -7,6 +7,7 @@ import { initials } from "@/lib/utils";
 import { Realtime } from "@/components/Realtime";
 import { ThreadComposer } from "@/components/messages/ThreadComposer";
 import { markMessageRead } from "@/app/actions/director";
+import { st } from "@/lib/i18n/server";
 
 export default async function MessageThreadPage({
   params,
@@ -60,7 +61,7 @@ export default async function MessageThreadPage({
         <Link
           href="/messages"
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-soft border border-slate-100 text-slate-600"
-          aria-label="Retour"
+          aria-label={st("generic.return")}
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
@@ -80,7 +81,7 @@ export default async function MessageThreadPage({
       <div className="flex-1 overflow-y-auto rounded-2xl border border-slate-100 bg-white p-3 space-y-2">
         {messages.length === 0 ? (
           <div className="flex h-full items-center justify-center px-4 text-center text-sm text-slate-400">
-            Aucun message. Tapez votre premier message ci-dessous.
+            {st("msg.threadEmpty")}
           </div>
         ) : (
           messages.map((m) => {

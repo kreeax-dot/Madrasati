@@ -2,6 +2,9 @@
 // renders this string + the short git SHA from Vercel so a screenshot is
 // enough to know which build is live.
 //
+//   v20 — OTP UX hint on the OTP screen, ~40 new Arabic translations
+//         (conversation thread, student form, signup screens), dashboard
+//         hero now shows the school name above the greeting
 //   v19 — NUCLEAR PWA cache reset: new SW deletes every previous cache on
 //         activation, hard-reloads all controlled clients via postMessage,
 //         passthrough fetch for HTML (no cache at all). PWARegister now
@@ -52,7 +55,7 @@
 //
 // Vercel sets VERCEL_GIT_COMMIT_SHA at build time for every deployment. We
 // expose it as NEXT_PUBLIC_* via next.config (or fall back if running locally).
-export const APP_VERSION = "v19";
+export const APP_VERSION = "v20";
 
 export const APP_BUILD_SHA =
   process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local";

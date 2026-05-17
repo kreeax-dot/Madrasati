@@ -13,7 +13,7 @@
 //   • /icons/*, /manifest.json → cache-first.
 //   • Anything else           → network only.
 
-const VERSION = "v19";
+const VERSION = "v20";
 const STATIC_CACHE = `madrasati-static-${VERSION}`;
 const ICON_CACHE = `madrasati-icons-${VERSION}`;
 const ALL_CACHES = [STATIC_CACHE, ICON_CACHE];

@@ -124,7 +124,7 @@ export default async function MessagesPage() {
       {conversations.length === 0 ? (
         <div className="card flex flex-col items-center gap-2 px-4 py-10 text-slate-400">
           <Inbox className="h-6 w-6" />
-          <p className="text-sm">Aucune conversation.</p>
+          <p className="text-sm">{st("msg.emptyConversations")}</p>
         </div>
       ) : (
         <ul className="card divide-y divide-slate-100">
@@ -164,7 +164,7 @@ export default async function MessagesPage() {
                           : "text-slate-500"
                       }`}
                     >
-                      {youSent ? "Vous : " : ""}
+                      {youSent ? st("msg.yousent") : ""}
                       {m.subject ?? m.body}
                     </p>
                     <p className="mt-0.5 truncate text-[11px] text-slate-400">
