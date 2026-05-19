@@ -122,6 +122,7 @@ export default async function DashboardPage() {
     "homework",
     "exams",
     "remedials",
+    "announcements",
     "photos",
     "absences",
     "payments",
@@ -133,6 +134,7 @@ export default async function DashboardPage() {
     "homework",
     "exams",
     "remedials",
+    "announcements",
     "photos",
     "canteen",
     "absences",
@@ -145,6 +147,7 @@ export default async function DashboardPage() {
     "exams",
     "remedials",
     "photos",
+    "announcements",
   ]);
   const tiles = (isDirector ? directorTiles : userTiles).filter(
     (k) => enabled[k] !== false || alwaysOn.has(k),
@@ -338,31 +341,31 @@ function Stat({
 function FeatureTile({ feature }: { feature: FeatureKey }) {
   const f = features[feature];
   const Icon = f.icon;
-  // Translate the label via the cookie-based locale so the tile shows the
-  // user's language. `st()` resolves at render time on the server.
   const label = st(f.labelKey);
   return (
     <Link
       href={f.href}
-      className={`relative flex aspect-square flex-col justify-between overflow-hidden rounded-2xl bg-gradient-to-br ${f.gradient} p-3.5 text-white shadow-tile transition active:scale-[0.97]`}
+      className={`relative flex aspect-square flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-br ${f.gradient} p-3 text-white shadow-tile transition active:scale-[0.97]`}
     >
+      {/* Decorative blobs — sticker-style backdrop. */}
       <span
-        className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-white/15"
+        className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/15"
         aria-hidden
       />
       <span
-        className="pointer-events-none absolute -bottom-4 -left-3 h-14 w-14 rounded-full bg-black/10"
+        className="pointer-events-none absolute -bottom-6 -left-4 h-16 w-16 rounded-full bg-black/10"
         aria-hidden
       />
-      <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-white/25 backdrop-blur-sm">
-        <Icon className="h-5 w-5" />
+
+      {/* Big centered icon — main visual anchor of the tile. */}
+      <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-white/25 backdrop-blur-sm shadow-soft">
+        <Icon className="h-8 w-8" strokeWidth={2} />
       </div>
-      <div className="relative">
-        <p className="text-[10px] font-medium uppercase tracking-wider text-white/70">
-          Madrasati
-        </p>
-        <p className="mt-0.5 text-sm font-bold leading-tight">{label}</p>
-      </div>
+
+      {/* Label below */}
+      <p className="relative text-center text-sm font-bold leading-tight">
+        {label}
+      </p>
     </Link>
   );
 }

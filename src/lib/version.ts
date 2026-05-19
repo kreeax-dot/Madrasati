@@ -2,6 +2,12 @@
 // renders this string + the short git SHA from Vercel so a screenshot is
 // enough to know which build is live.
 //
+//   v22 — password reset reverts to signInWithOtp (same flow as student
+//         signup — uses Magic Link template the operator already
+//         configured); announcements feature (migration v12 + page +
+//         composer + notification feed); schedule week trimmed to
+//         Sun-Thu with colored-column layout; dashboard tiles now show
+//         large centered icons in sticker style
 //   v21 — password reset uses the dedicated recovery flow
 //         (resetPasswordForEmail + verifyOtp({type:'recovery'})) so OTPs
 //         no longer expire in 60s; features.ts labels translated via
@@ -62,7 +68,7 @@
 //
 // Vercel sets VERCEL_GIT_COMMIT_SHA at build time for every deployment. We
 // expose it as NEXT_PUBLIC_* via next.config (or fall back if running locally).
-export const APP_VERSION = "v21";
+export const APP_VERSION = "v22";
 
 export const APP_BUILD_SHA =
   process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local";

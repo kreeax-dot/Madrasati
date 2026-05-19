@@ -213,7 +213,12 @@ function LoginInner() {
     const res = await verifyPasswordResetOtp(forgotEmail, forgotToken);
     setLoading(false);
     if (!res.ok) {
-      setError(res.error);
+      // Surface raw Supabase message inline so we can diagnose persistent
+      // "expired" errors. The user-facing message stays first.
+      const debug = res.rawMessage
+        ? ` — [${res.supabaseCode ?? "?"}] ${res.rawMessage}`
+        : "";
+      setError(res.error + debug);
       return;
     }
     setForgotNewPassword("");

@@ -4,6 +4,7 @@ import {
   ClipboardList,
   GraduationCap,
   Images,
+  Megaphone,
   MessagesSquare,
   Repeat,
   UtensilsCrossed,
@@ -21,7 +22,8 @@ export type FeatureKey =
   | "canteen"
   | "exams"
   | "remedials"
-  | "photos";
+  | "photos"
+  | "announcements";
 
 export const features: Record<
   FeatureKey,
@@ -137,5 +139,16 @@ export const features: Record<
     ring: "ring-cyan-100",
     gradient: "from-cyan-500 to-cyan-700",
     href: "/photos",
+  },
+  announcements: {
+    label: "Annonces",
+    labelKey: "nav.announcements",
+    icon: Megaphone,
+    bg: "bg-fuchsia-500",
+    bgSoft: "bg-fuchsia-50",
+    text: "text-fuchsia-600",
+    ring: "ring-fuchsia-100",
+    gradient: "from-fuchsia-500 to-fuchsia-700",
+    href: "/announcements",
   },
 };

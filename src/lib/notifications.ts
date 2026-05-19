@@ -90,9 +90,16 @@ export async function fetchNotifications(limit = 30): Promise<NotifItem[]> {
           .order("created_at", { ascending: false })
           .limit(limit),
       ),
+      safe(() =>
+        supabase
+          .from("announcements")
+          .select("id, title, body, created_at, created_by")
+          .order("created_at", { ascending: false })
+          .limit(limit),
+      ),
     ]);
 
-    const [hw, msg, pay, abs, sch, ex, rem] = settled.map((r) =>
+    const [hw, msg, pay, abs, sch, ex, rem, ann] = settled.map((r) =>
       r.status === "fulfilled" ? r.value : [],
     );
 
@@ -192,6 +199,18 @@ export async function fetchNotifications(limit = 30): Promise<NotifItem[]> {
         body: `${r.reason ?? ""}${r.session_date ? ` — ${r.session_date}` : ""}`,
         timestamp: r.created_at,
         href: "/remedials",
+      });
+    });
+
+    (ann as any[]).forEach((a) => {
+      if (a.created_by === meId) return; // director skips own announcement
+      out.push({
+        id: `ann-${a.id}`,
+        feature: "announcements",
+        title: `Annonce · ${a.title}`,
+        body: a.body ?? "",
+        timestamp: a.created_at,
+        href: "/announcements",
       });
     });
 

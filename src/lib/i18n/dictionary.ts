@@ -19,6 +19,7 @@ export const fr = {
   "nav.remedials": "Rattrapages",
   "nav.photos": "Photos",
   "nav.messages": "Messages",
+  "nav.announcements": "Annonces",
 
   // common actions
   "common.create": "Créer",
@@ -250,6 +251,22 @@ export const fr = {
   "canteen.main": "Plat",
   "canteen.dessert": "Dessert",
 
+  // announcements
+  "page.announcements.title": "Annonces",
+  "page.announcements.subtitle.director": "Diffusion",
+  "page.announcements.subtitle.user": "À l'attention de tous",
+  "page.announcements.empty": "Aucune annonce pour le moment.",
+  "page.announcements.newCta": "Nouvelle annonce",
+  "page.announcements.composeTitle": "Nouvelle annonce",
+  "page.announcements.composeHint":
+    "Envoyée à TOUS les élèves et parents de l'école.",
+  "page.announcements.fieldTitle": "Titre",
+  "page.announcements.fieldBody": "Contenu",
+  "page.announcements.titlePlaceholder": "Réunion parents-professeurs",
+  "page.announcements.bodyPlaceholder": "Bonjour,…",
+  "page.announcements.publish": "Publier l'annonce",
+  "page.announcements.published": "Annonce publiée.",
+
   // student danger zone
   "student.dangerZone": "Zone de danger",
   "student.disable": "Désactiver le compte",
@@ -283,6 +300,7 @@ export const ar: Partial<Dictionary> = {
   "nav.remedials": "حصص الاستدراك",
   "nav.photos": "الصور",
   "nav.messages": "الرسائل",
+  "nav.announcements": "الإعلانات",
 
   // common actions
   "common.create": "إنشاء",
@@ -513,6 +531,22 @@ export const ar: Partial<Dictionary> = {
   "canteen.starter": "مقبلات",
   "canteen.main": "طبق رئيسي",
   "canteen.dessert": "حلوى",
+
+  // announcements
+  "page.announcements.title": "الإعلانات",
+  "page.announcements.subtitle.director": "النشر",
+  "page.announcements.subtitle.user": "لكافة التلاميذ",
+  "page.announcements.empty": "لا توجد إعلانات حاليًا.",
+  "page.announcements.newCta": "إعلان جديد",
+  "page.announcements.composeTitle": "إعلان جديد",
+  "page.announcements.composeHint":
+    "يُرسل إلى جميع تلاميذ المدرسة وأوليائهم.",
+  "page.announcements.fieldTitle": "العنوان",
+  "page.announcements.fieldBody": "المحتوى",
+  "page.announcements.titlePlaceholder": "اجتماع الأولياء",
+  "page.announcements.bodyPlaceholder": "السلام عليكم،…",
+  "page.announcements.publish": "نشر الإعلان",
+  "page.announcements.published": "تم نشر الإعلان.",
 
   // student danger zone
   "student.dangerZone": "منطقة الخطر",

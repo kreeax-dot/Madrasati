@@ -1045,6 +1045,100 @@ async function resolveRecipients(
 }
 
 /**
+ * Create a school-wide announcement. Director-only.
+ *
+ * One row in `announcements` is visible to every member of the school
+ * (directors, students, parents) via the RLS policy installed in
+ * migration_v12.sql.
+ */
+export type AnnouncementResult =
+  | { ok: true; id: string }
+  | { ok: false; error: string; step: string; details?: Record<string, unknown> };
+
+export async function createAnnouncement(
+  formData: FormData,
+): Promise<AnnouncementResult> {
+  let step = "init";
+  try {
+    step = "auth";
+    const { profile } = await requireRole(["director"]);
+    if (!profile.school_id) {
+      return { ok: false, error: "Aucune école assignée.", step };
+    }
+
+    step = "parse";
+    const title = String(formData.get("title") ?? "").trim();
+    const body = String(formData.get("body") ?? "").trim();
+    if (!title) return { ok: false, error: "Titre requis.", step };
+    if (!body) return { ok: false, error: "Contenu requis.", step };
+
+    step = "insert";
+    const { data, error } = await adminWriter()
+      .from("announcements")
+      .insert({
+        school_id: profile.school_id,
+        title,
+        body,
+        created_by: profile.id,
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      const pgCode = (error as any).code;
+      if (pgCode === "PGRST205") {
+        return {
+          ok: false,
+          error:
+            "Table announcements introuvable. Appliquez supabase/migration_v12.sql.",
+          step,
+          details: { code: pgCode },
+        };
+      }
+      return {
+        ok: false,
+        error: error.message,
+        step,
+        details: {
+          code: pgCode,
+          hint: (error as any).hint,
+        },
+      };
+    }
+
+    revalidatePath("/announcements");
+    revalidatePath("/dashboard");
+    return { ok: true, id: (data as any).id };
+  } catch (err: any) {
+    console.error("[createAnnouncement] UNCAUGHT", err);
+    return {
+      ok: false,
+      error: err?.message ?? "Erreur inconnue",
+      step,
+      details: { stack: err?.stack },
+    };
+  }
+}
+
+export async function deleteAnnouncement(
+  id: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await requireRole(["director"]);
+    if (!id) return { ok: false, error: "ID requis" };
+    const { error } = await adminWriter()
+      .from("announcements")
+      .delete()
+      .eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/announcements");
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err?.message ?? "Erreur" };
+  }
+}
+
+/**
  * Send a message inside a conversation thread to a specific partner
  * profile. Both directions (student → director, director → student,
  * parent → director, etc.) go through here. Used by /messages/[partnerId].

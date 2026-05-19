@@ -5,7 +5,8 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 import { createSchedule, deleteSchedule } from "@/app/actions/director";
 import { useRouter } from "next/navigation";
 
-const DAYS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+// School week is Sun-Thu — Friday/Saturday were dropped per spec.
+const DAYS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi"] as const;
 
 type Cls = { id: string; name: string };
 type Slot = {
