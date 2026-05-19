@@ -338,12 +338,14 @@ function Stat({
 function FeatureTile({ feature }: { feature: FeatureKey }) {
   const f = features[feature];
   const Icon = f.icon;
+  // Translate the label via the cookie-based locale so the tile shows the
+  // user's language. `st()` resolves at render time on the server.
+  const label = st(f.labelKey);
   return (
     <Link
       href={f.href}
       className={`relative flex aspect-square flex-col justify-between overflow-hidden rounded-2xl bg-gradient-to-br ${f.gradient} p-3.5 text-white shadow-tile transition active:scale-[0.97]`}
     >
-      {/* Decorative blob — abstract organic shape echoing the design mockups. */}
       <span
         className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-white/15"
         aria-hidden
@@ -359,7 +361,7 @@ function FeatureTile({ feature }: { feature: FeatureKey }) {
         <p className="text-[10px] font-medium uppercase tracking-wider text-white/70">
           Madrasati
         </p>
-        <p className="mt-0.5 text-sm font-bold leading-tight">{f.label}</p>
+        <p className="mt-0.5 text-sm font-bold leading-tight">{label}</p>
       </div>
     </Link>
   );

@@ -223,6 +223,47 @@ export const fr = {
 
   // generic
   "generic.return": "Retour",
+
+  // days of week (Sunday = 0, Monday = 1, …, Saturday = 6)
+  "day.0": "Dimanche",
+  "day.1": "Lundi",
+  "day.2": "Mardi",
+  "day.3": "Mercredi",
+  "day.4": "Jeudi",
+  "day.5": "Vendredi",
+  "day.6": "Samedi",
+  "day.today": "aujourd'hui",
+
+  // homework
+  "homework.dueOn": "À rendre le",
+  "homework.empty": "Aucun devoir pour le moment.",
+  "homework.giveCta": "Donner un devoir",
+  "homework.publish": "Publier",
+  "homework.fieldSubject": "Matière",
+  "homework.fieldTitle": "Titre",
+  "homework.fieldDueDate": "À rendre le",
+  "homework.fieldDescription": "Description",
+  "homework.classFirst": "Créez d'abord une classe.",
+
+  // canteen
+  "canteen.starter": "Entrée",
+  "canteen.main": "Plat",
+  "canteen.dessert": "Dessert",
+
+  // student danger zone
+  "student.dangerZone": "Zone de danger",
+  "student.disable": "Désactiver le compte",
+  "student.enable": "Réactiver le compte",
+  "student.disabled": "Compte désactivé",
+  "student.disabledHint":
+    "L'élève ne peut plus se connecter. Les données sont conservées.",
+  "student.deletePerm": "Supprimer définitivement",
+  "student.deleteConfirmTitle": "Supprimer cet élève ?",
+  "student.deleteConfirmBody":
+    "Toutes les données associées (paiements, absences, devoirs, rattrapages, photos) seront supprimées. Le compte de connexion sera également supprimé. Action irréversible.",
+  "student.deletedOk": "Élève supprimé.",
+  "student.disabledOk": "Compte désactivé.",
+  "student.enabledOk": "Compte réactivé.",
 } as const;
 
 export type DictionaryKey = keyof typeof fr;
@@ -446,6 +487,47 @@ export const ar: Partial<Dictionary> = {
 
   // generic
   "generic.return": "رجوع",
+
+  // days of week (Sunday = 0)
+  "day.0": "الأحد",
+  "day.1": "الإثنين",
+  "day.2": "الثلاثاء",
+  "day.3": "الأربعاء",
+  "day.4": "الخميس",
+  "day.5": "الجمعة",
+  "day.6": "السبت",
+  "day.today": "اليوم",
+
+  // homework
+  "homework.dueOn": "للتسليم في",
+  "homework.empty": "لا توجد واجبات حاليًا.",
+  "homework.giveCta": "إعطاء واجب",
+  "homework.publish": "نشر",
+  "homework.fieldSubject": "المادة",
+  "homework.fieldTitle": "العنوان",
+  "homework.fieldDueDate": "للتسليم في",
+  "homework.fieldDescription": "الوصف",
+  "homework.classFirst": "أنشئ قسمًا أولاً.",
+
+  // canteen
+  "canteen.starter": "مقبلات",
+  "canteen.main": "طبق رئيسي",
+  "canteen.dessert": "حلوى",
+
+  // student danger zone
+  "student.dangerZone": "منطقة الخطر",
+  "student.disable": "تعطيل الحساب",
+  "student.enable": "إعادة تفعيل الحساب",
+  "student.disabled": "الحساب معطّل",
+  "student.disabledHint":
+    "لا يمكن للتلميذ تسجيل الدخول. تُحفظ البيانات.",
+  "student.deletePerm": "حذف نهائي",
+  "student.deleteConfirmTitle": "حذف هذا التلميذ ؟",
+  "student.deleteConfirmBody":
+    "ستُحذف جميع البيانات المرتبطة (المدفوعات، الغيابات، الواجبات، الاستدراك، الصور). سيُحذف حساب الدخول أيضًا. لا يمكن التراجع.",
+  "student.deletedOk": "تم حذف التلميذ.",
+  "student.disabledOk": "تم تعطيل الحساب.",
+  "student.enabledOk": "تم تفعيل الحساب.",
 };
 
 export type Locale = "fr" | "ar";

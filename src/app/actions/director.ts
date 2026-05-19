@@ -287,6 +287,177 @@ export async function createStudent(
  *      (PGRST204 — schema not migrated yet) → log a hint that
  *      migration_v8.sql needs to be applied; otherwise log the message.
  */
+/**
+ * Permanently delete a student. Cascades through every school-scoped
+ * child table (payments, absences, homework class link… all set up via
+ * FK on delete cascade), and also deletes the linked auth user if one
+ * exists so the family loses login access at the same time.
+ *
+ * Director-scoped: the deleted student must belong to the caller's
+ * school — enforced by the explicit `eq("school_id", schoolId)` filter.
+ */
+export type DeleteStudentResult =
+  | { ok: true }
+  | { ok: false; error: string; step: string };
+
+export async function deleteStudent(
+  studentId: string,
+): Promise<DeleteStudentResult> {
+  let step = "init";
+  try {
+    step = "auth";
+    const schoolId = await getSchoolId();
+    if (!studentId) {
+      return { ok: false, error: "Élève requis.", step };
+    }
+
+    const admin = adminWriter();
+
+    step = "load_student";
+    const { data: student } = await admin
+      .from("students")
+      .select("id, school_id")
+      .eq("id", studentId)
+      .maybeSingle();
+    if (!student) {
+      return { ok: false, error: "Élève introuvable.", step };
+    }
+    if ((student as any).school_id !== schoolId) {
+      return { ok: false, error: "Élève hors de votre école.", step };
+    }
+
+    step = "find_linked_profile";
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("student_id", studentId)
+      .maybeSingle();
+
+    step = "delete_student_row";
+    const { error: delErr } = await admin
+      .from("students")
+      .delete()
+      .eq("id", studentId)
+      .eq("school_id", schoolId);
+    if (delErr) {
+      return { ok: false, error: delErr.message, step };
+    }
+
+    // Best-effort: also delete the linked auth user so the family loses
+    // login access. If this fails (e.g. service-role key missing) the
+    // student record is already gone, so we still return ok.
+    if (profile && (profile as any).id) {
+      step = "delete_auth_user";
+      try {
+        await admin.auth.admin.deleteUser((profile as any).id);
+      } catch (err: any) {
+        console.warn(
+          "[deleteStudent] auth.deleteUser failed (non-fatal):",
+          err?.message ?? err,
+        );
+      }
+    }
+
+    revalidatePath("/students");
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (err: any) {
+    console.error("[deleteStudent] UNCAUGHT", {
+      step,
+      message: err?.message,
+      stack: err?.stack,
+    });
+    return {
+      ok: false,
+      error: err?.message ?? "Erreur inconnue",
+      step,
+    };
+  }
+}
+
+/**
+ * Disable a student's account. Sets `students.is_active = false` and
+ * bans the linked auth user for one year. Data is preserved.
+ */
+export async function setStudentEnabled(
+  studentId: string,
+  enabled: boolean,
+): Promise<DeleteStudentResult> {
+  let step = "init";
+  try {
+    step = "auth";
+    const schoolId = await getSchoolId();
+    if (!studentId) {
+      return { ok: false, error: "Élève requis.", step };
+    }
+
+    const admin = adminWriter();
+
+    step = "verify_scope";
+    const { data: student } = await admin
+      .from("students")
+      .select("id, school_id")
+      .eq("id", studentId)
+      .maybeSingle();
+    if (!student) return { ok: false, error: "Élève introuvable.", step };
+    if ((student as any).school_id !== schoolId) {
+      return { ok: false, error: "Élève hors de votre école.", step };
+    }
+
+    step = "update_is_active";
+    const { error: upErr } = await admin
+      .from("students")
+      .update({ is_active: enabled })
+      .eq("id", studentId);
+    if (upErr) {
+      if ((upErr as any).code === "PGRST204") {
+        return {
+          ok: false,
+          error:
+            "Colonne is_active manquante. Appliquez supabase/migration_v11.sql.",
+          step,
+        };
+      }
+      return { ok: false, error: upErr.message, step };
+    }
+
+    step = "ban_user";
+    const { data: linked } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("student_id", studentId)
+      .maybeSingle();
+    if (linked && (linked as any).id) {
+      try {
+        await admin.auth.admin.updateUserById((linked as any).id, {
+          ban_duration: enabled ? "none" : "8760h",
+        });
+      } catch (err: any) {
+        console.warn(
+          "[setStudentEnabled] ban update failed (non-fatal):",
+          err?.message ?? err,
+        );
+      }
+    }
+
+    revalidatePath("/students");
+    revalidatePath(`/students/${studentId}`);
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (err: any) {
+    console.error("[setStudentEnabled] UNCAUGHT", {
+      step,
+      message: err?.message,
+      stack: err?.stack,
+    });
+    return {
+      ok: false,
+      error: err?.message ?? "Erreur inconnue",
+      step,
+    };
+  }
+}
+
 async function maybeAttachAvatar(
   supabase: ReturnType<typeof createClient>,
   schoolId: string,

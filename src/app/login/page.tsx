@@ -549,13 +549,20 @@ function ForgotPasswordSection({
         <p className="font-semibold">Réinitialisation du mot de passe</p>
         <p className="mt-1 text-xs">
           {step === "email" &&
-            "Entrez l'email de votre compte. Nous vous enverrons un code à 6 chiffres."}
+            "Entrez l'email de votre compte. Nous vous enverrons un code à 6 chiffres valable 1 heure."}
           {step === "otp" &&
             "Entrez le code à 6 chiffres reçu par email pour confirmer votre identité."}
-          {step === "password" &&
-            "Choisissez votre nouveau mot de passe."}
+          {step === "password" && "Choisissez votre nouveau mot de passe."}
           {step === "done" && "Mot de passe modifié. Redirection…"}
         </p>
+        {step === "otp" && (
+          <p className="mt-2 text-[10px] text-brand-800/70">
+            Vous recevez un lien au lieu d&apos;un code ? Le template
+            <span className="font-mono"> « Reset Password » </span>de Supabase
+            doit utiliser
+            <span className="font-mono"> {"{{ .Token }}"}</span>.
+          </p>
+        )}
       </div>
 
       {step === "email" && (

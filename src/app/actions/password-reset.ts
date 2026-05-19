@@ -3,21 +3,33 @@
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * Password reset via email OTP.
+ * Password reset using Supabase's DEDICATED recovery flow (NOT the
+ * signInWithOtp magic-link flow, which has a much shorter TTL and was
+ * causing "Code expired" errors within ~60 seconds).
+ *
+ * Why this flow:
+ *   - `resetPasswordForEmail` sends an email through the dedicated
+ *     "Reset Password" template. The associated token is a recovery
+ *     token with a longer TTL (default 1 hour on Supabase) — controlled
+ *     by Dashboard → Authentication → URL Configuration → OTP Expiry.
+ *   - `verifyOtp({ type: 'recovery' })` is the matching verification
+ *     call. It validates the recovery token AND establishes a session
+ *     (so the subsequent `updateUser({ password })` call is authorised).
  *
  *   1. requestPasswordResetOtp(email)
- *      → supabase.auth.signInWithOtp({ email, shouldCreateUser: false })
- *      User receives a 6-digit code.
+ *      → supabase.auth.resetPasswordForEmail(email)
  *
  *   2. verifyPasswordResetOtp(email, token)
- *      → supabase.auth.verifyOtp({ email, token, type: 'email' })
- *      On success a session is set (cookies updated by SSR helper).
+ *      → supabase.auth.verifyOtp({ email, token, type: 'recovery' })
  *
  *   3. setNewPasswordAfterReset(newPassword)
  *      → supabase.auth.updateUser({ password })
- *      Caller must already be authenticated (via step 2).
  *
- * All three return structured results — never throw.
+ * Operator-side requirements (one-time, on Supabase Dashboard):
+ *   - Authentication → Email Templates → "Reset Password" template:
+ *       body should include {{ .Token }} (the 6-digit code).
+ *   - Authentication → URL Configuration → OTP Expiry:
+ *       set to at least 600 seconds (10 minutes). Default 3600s = 1h.
  */
 
 export type ResetResult =
@@ -29,10 +41,9 @@ export async function requestPasswordResetOtp(
 ): Promise<ResetResult> {
   try {
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim().toLowerCase(),
-      options: { shouldCreateUser: false },
-    });
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+    );
     if (error) return { ok: false, error: error.message };
     return { ok: true };
   } catch (err: any) {
@@ -49,15 +60,18 @@ export async function verifyPasswordResetOtp(
     const { error } = await supabase.auth.verifyOtp({
       email: email.trim().toLowerCase(),
       token: token.trim(),
-      type: "email",
+      type: "recovery",
     });
     if (error) {
       const msg = error.message?.toLowerCase() ?? "";
+      // Map known error patterns to user-friendly French.
       const userFacing = msg.includes("expired")
-        ? "Code expiré. Demandez-en un nouveau."
+        ? "Code expiré. Demandez-en un nouveau (le code est valable 1 heure)."
         : msg.includes("invalid") || msg.includes("not found")
           ? "Code invalide."
-          : error.message;
+          : msg.includes("rate")
+            ? "Trop de tentatives. Réessayez dans quelques minutes."
+            : error.message;
       return { ok: false, error: userFacing };
     }
     return { ok: true };

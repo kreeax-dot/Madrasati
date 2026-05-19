@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { createHomework, deleteHomework } from "@/app/actions/director";
 import { formatDate } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n/LanguageProvider";
 
 type Cls = { id: string; name: string };
 type Hw = {
@@ -23,6 +24,7 @@ export function HomeworkEditor({
   classes: Cls[];
   homework: Hw[];
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +57,7 @@ export function HomeworkEditor({
   if (classes.length === 0) {
     return (
       <div className="card px-4 py-10 text-center text-sm text-slate-500">
-        Créez d&apos;abord une classe.
+        {t("homework.classFirst")}
       </div>
     );
   }
@@ -64,13 +66,13 @@ export function HomeworkEditor({
     <div className="space-y-4">
       <button onClick={() => setOpen((v) => !v)} className="btn-primary w-full">
         <Plus className="h-4 w-4" />
-        {open ? "Annuler" : "Donner un devoir"}
+        {open ? t("common.cancel") : t("homework.giveCta")}
       </button>
 
       {open && (
         <form onSubmit={onSubmit} className="card space-y-3 p-4">
           <div>
-            <label className="label">Classe</label>
+            <label className="label">{t("student.class")}</label>
             <select name="class_id" required className="input">
               {classes.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -79,25 +81,24 @@ export function HomeworkEditor({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Matière</label>
+              <label className="label">{t("homework.fieldSubject")}</label>
               <input name="subject" required className="input" placeholder="Math" />
             </div>
             <div>
-              <label className="label">À rendre le</label>
+              <label className="label">{t("homework.fieldDueDate")}</label>
               <input name="due_date" type="date" required className="input" />
             </div>
           </div>
           <div>
-            <label className="label">Titre</label>
-            <input name="title" required className="input" placeholder="Exercice 12 page 45" />
+            <label className="label">{t("homework.fieldTitle")}</label>
+            <input name="title" required className="input" />
           </div>
           <div>
-            <label className="label">Description</label>
+            <label className="label">{t("homework.fieldDescription")}</label>
             <textarea
               name="description"
               rows={3}
               className="input resize-none"
-              placeholder="Détails…"
             />
           </div>
           {error && (
@@ -107,14 +108,14 @@ export function HomeworkEditor({
           )}
           <button type="submit" disabled={pending} className="btn-primary w-full">
             {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Publier
+            {t("homework.publish")}
           </button>
         </form>
       )}
 
       {visible.length === 0 ? (
         <div className="card px-4 py-10 text-center text-sm text-slate-400">
-          Aucun devoir pour le moment.
+          {t("homework.empty")}
         </div>
       ) : (
         <ul className="space-y-3">
@@ -130,14 +131,14 @@ export function HomeworkEditor({
                     <p className="mt-1 text-sm text-slate-600">{h.description}</p>
                   )}
                   <p className="mt-2 text-xs text-slate-400">
-                    À rendre le {formatDate(h.due_date)}
+                    {t("homework.dueOn")} {formatDate(h.due_date)}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => onDelete(h.id)}
                   className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600"
-                  aria-label="Supprimer"
+                  aria-label={t("common.delete")}
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>

@@ -10,6 +10,7 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
+import type { DictionaryKey } from "@/lib/i18n/dictionary";
 
 export type FeatureKey =
   | "messages"
@@ -25,7 +26,10 @@ export type FeatureKey =
 export const features: Record<
   FeatureKey,
   {
+    /** French label — kept for legacy callers / fallback. */
     label: string;
+    /** Dictionary key to translate via `t(labelKey)`. */
+    labelKey: DictionaryKey;
     icon: LucideIcon;
     bg: string;
     bgSoft: string;
@@ -37,6 +41,7 @@ export const features: Record<
 > = {
   messages: {
     label: "Messages",
+    labelKey: "nav.messages",
     icon: MessagesSquare,
     bg: "bg-blue-500",
     bgSoft: "bg-blue-50",
@@ -47,6 +52,7 @@ export const features: Record<
   },
   homework: {
     label: "Devoirs",
+    labelKey: "nav.homework",
     icon: BookOpen,
     bg: "bg-purple-500",
     bgSoft: "bg-purple-50",
@@ -57,6 +63,7 @@ export const features: Record<
   },
   schedule: {
     label: "Emploi du temps",
+    labelKey: "nav.schedule",
     icon: CalendarRange,
     bg: "bg-orange-500",
     bgSoft: "bg-orange-50",
@@ -67,6 +74,7 @@ export const features: Record<
   },
   payments: {
     label: "Paiements",
+    labelKey: "nav.payments",
     icon: Wallet,
     bg: "bg-emerald-500",
     bgSoft: "bg-emerald-50",
@@ -77,6 +85,7 @@ export const features: Record<
   },
   absences: {
     label: "Absences",
+    labelKey: "nav.absences",
     icon: ClipboardList,
     bg: "bg-red-500",
     bgSoft: "bg-red-50",
@@ -87,6 +96,7 @@ export const features: Record<
   },
   canteen: {
     label: "Cantine",
+    labelKey: "nav.canteen",
     icon: UtensilsCrossed,
     bg: "bg-amber-500",
     bgSoft: "bg-amber-50",
@@ -97,6 +107,7 @@ export const features: Record<
   },
   exams: {
     label: "Examens",
+    labelKey: "nav.exams",
     icon: GraduationCap,
     bg: "bg-rose-500",
     bgSoft: "bg-rose-50",
@@ -107,6 +118,7 @@ export const features: Record<
   },
   remedials: {
     label: "Rattrapages",
+    labelKey: "nav.remedials",
     icon: Repeat,
     bg: "bg-indigo-500",
     bgSoft: "bg-indigo-50",
@@ -117,6 +129,7 @@ export const features: Record<
   },
   photos: {
     label: "Photos",
+    labelKey: "nav.photos",
     icon: Images,
     bg: "bg-cyan-500",
     bgSoft: "bg-cyan-50",

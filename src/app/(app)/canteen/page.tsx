@@ -6,7 +6,9 @@ import { requireRole } from "@/lib/auth";
 import { CanteenEditor } from "@/components/director/CanteenEditor";
 import { Realtime } from "@/components/Realtime";
 
-const DAYS_LONG = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+// Day names are looked up via the dictionary so the canteen page renders
+// in the active locale (FR or AR).
+const DAY_KEYS = ["day.0", "day.1", "day.2", "day.3", "day.4", "day.5", "day.6"] as const;
 
 function mondayOf(d: Date) {
   const x = new Date(d);
@@ -64,7 +66,7 @@ export default async function CanteenPage() {
       {menus?.length === 0 ? (
         <div className="card flex flex-col items-center gap-2 px-4 py-12 text-slate-400">
           <UtensilsCrossed className="h-7 w-7" />
-          <p className="text-sm">Aucun menu publié.</p>
+          <p className="text-sm">{st("page.canteen.empty")}</p>
         </div>
       ) : (
         <ul className="space-y-3">
@@ -78,21 +80,26 @@ export default async function CanteenPage() {
               >
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">
-                    {DAYS_LONG[d]} {isToday && "· aujourd'hui"}
+                    {st(DAY_KEYS[d])}{" "}
+                    {isToday && `· ${st("day.today")}`}
                   </p>
                   <UtensilsCrossed className="h-4 w-4 text-amber-400" />
                 </div>
                 {m ? (
                   <div className="mt-3 space-y-1.5 text-sm">
-                    {m.starter && <Row label="Entrée" value={m.starter} />}
-                    {m.main && <Row label="Plat" value={m.main} />}
-                    {m.dessert && <Row label="Dessert" value={m.dessert} />}
+                    {m.starter && (
+                      <Row label={st("canteen.starter")} value={m.starter} />
+                    )}
+                    {m.main && <Row label={st("canteen.main")} value={m.main} />}
+                    {m.dessert && (
+                      <Row label={st("canteen.dessert")} value={m.dessert} />
+                    )}
                     {m.notes && (
                       <p className="mt-2 text-xs text-slate-500">{m.notes}</p>
                     )}
                   </div>
                 ) : (
-                  <p className="mt-3 text-sm text-slate-400">Pas encore de menu.</p>
+                  <p className="mt-3 text-sm text-slate-400">—</p>
                 )}
               </li>
             );

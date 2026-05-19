@@ -2,6 +2,13 @@
 // renders this string + the short git SHA from Vercel so a screenshot is
 // enough to know which build is live.
 //
+//   v21 — password reset uses the dedicated recovery flow
+//         (resetPasswordForEmail + verifyOtp({type:'recovery'})) so OTPs
+//         no longer expire in 60s; features.ts labels translated via
+//         dictionary keys (dashboard tiles + bell rows); canteen days /
+//         homework strings / HomeworkEditor wired to t(); new
+//         migration v11 (students.is_active) + deleteStudent +
+//         setStudentEnabled actions + StudentDangerZone UI
 //   v20 — OTP UX hint on the OTP screen, ~40 new Arabic translations
 //         (conversation thread, student form, signup screens), dashboard
 //         hero now shows the school name above the greeting
@@ -55,7 +62,7 @@
 //
 // Vercel sets VERCEL_GIT_COMMIT_SHA at build time for every deployment. We
 // expose it as NEXT_PUBLIC_* via next.config (or fall back if running locally).
-export const APP_VERSION = "v20";
+export const APP_VERSION = "v21";
 
 export const APP_BUILD_SHA =
   process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local";

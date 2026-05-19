@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/auth";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { StudentQuickActions } from "@/components/director/StudentQuickActions";
 import { StudentAvatarEditor } from "@/components/director/StudentAvatarEditor";
+import { StudentDangerZone } from "@/components/director/StudentDangerZone";
 
 export default async function StudentDetailPage({
   params,
@@ -15,12 +16,28 @@ export default async function StudentDetailPage({
   await requireRole(["director"]);
   const supabase = createClient();
 
-  const { data: student } = await supabase
-    .from("students")
-    .select("id, full_name, class_id, date_of_birth, avatar_url")
-    .eq("id", params.id)
-    .maybeSingle();
-  if (!student) notFound();
+  // is_active is selected best-effort — column may not exist yet if
+  // migration_v11.sql hasn't been applied. Treat missing/true as enabled.
+  let studentRow: any = null;
+  {
+    const withFlag = await supabase
+      .from("students")
+      .select("id, full_name, class_id, date_of_birth, avatar_url, is_active")
+      .eq("id", params.id)
+      .maybeSingle();
+    if (withFlag.error && (withFlag.error as any).code === "PGRST204") {
+      const fallback = await supabase
+        .from("students")
+        .select("id, full_name, class_id, date_of_birth, avatar_url")
+        .eq("id", params.id)
+        .maybeSingle();
+      studentRow = fallback.data;
+    } else {
+      studentRow = withFlag.data;
+    }
+  }
+  if (!studentRow) notFound();
+  const student = studentRow;
 
   let className: string | null = null;
   if ((student as any).class_id) {
@@ -234,6 +251,12 @@ export default async function StudentDetailPage({
           </ul>
         )}
       </section>
+
+      <StudentDangerZone
+        studentId={student.id}
+        studentName={student.full_name}
+        isActive={student.is_active === false ? false : true}
+      />
     </div>
   );
 }
